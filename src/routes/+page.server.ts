@@ -28,7 +28,8 @@ export const load: PageServerLoad = async () => {
       vendors = dedupeById([...SEED_VENDORS, ...vendorRes.data.map(mapVendorRow)]);
     }
     if (productRes?.data?.length) {
-      products = dedupeById([...SEED_PRODUCTS, ...productRes.data.map(mapProductRow)]);
+      // DB (Neural Grid) is the source of truth for products; seed is fallback only.
+      products = dedupeById(productRes.data.map(mapProductRow));
     }
   }
 

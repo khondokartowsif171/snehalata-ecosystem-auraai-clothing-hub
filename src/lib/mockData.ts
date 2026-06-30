@@ -120,7 +120,9 @@ export const addVendor = (vendor: Vendor) => {
 export const getProducts = (): Product[] => {
   const deleted = getDeletedIds();
   const dbProducts = loadFromDB<Product>('aura_products');
-  const combined = [...INITIAL_PRODUCTS, ...dbProducts, ...remoteProducts];
+  // Remote (Supabase) is the source of truth; fall back to seed only when empty.
+  const base = remoteProducts.length ? remoteProducts : INITIAL_PRODUCTS;
+  const combined = [...base, ...dbProducts];
   return Array.from(new Map(combined.map(item => [item.id, item])).values())
     .filter(p => !deleted.includes(p.id));
 };

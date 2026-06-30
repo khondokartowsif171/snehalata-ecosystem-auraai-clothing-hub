@@ -294,7 +294,8 @@ export const mapProductRow = (p: any): Product => ({
   category: p.category,
   imageUrl: p.image_url,
   externalUrl: p.external_url,
-  vendorId: p.vendor_id || 1
+  // Real DB schema has no vendor_id column; 0 => no vendor chip rendered.
+  vendorId: p.vendor_id ?? 0
 });
 
 /** Merge collections keeping the last occurrence per id (remote overrides seed). */
