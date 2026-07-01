@@ -4,15 +4,17 @@
   import { Zap, LayoutDashboard, Users, ShieldCheck, Cpu, Network, Package, Plus, Layout, Palette, Eye, Globe, BarChart3 } from '@lucide/svelte';
   import ProductCard from '$lib/components/ProductCard.svelte';
   import { analyzeWebsiteProducts } from '$lib/geminiService';
-  import { getVendors, getProductsByVendor, addProduct, deleteProduct, syncWithNeuralGrid } from '$lib/mockData';
-  import { addProductToSupabase } from '$lib/supabaseClient';
+  import { getVendors, getProductsByVendor, syncWithNeuralGrid } from '$lib/mockData';
   import type { Vendor } from '$lib/types';
+
+  const vendorToken = () => (typeof localStorage !== 'undefined' ? localStorage.getItem('aura_vendor_token') || '' : '');
 
   let vendor: any = $state(null);
   let products: any[] = $state([]);
   let loading = $state(true);
   let showLogin = $state(false);
   let loginEmail = $state('');
+  let loginPassword = $state('');
   let loginError: string | null = $state(null);
   let isLoggingIn = $state(false);
   let isAddingProduct = $state(false);
@@ -47,6 +49,7 @@
   function handleLogout() {
     localStorage.removeItem('aura_active_vendor_id');
     localStorage.removeItem('aura_active_vendor_email');
+    localStorage.removeItem('aura_vendor_token');
     window.location.reload();
   }
 
@@ -80,70 +83,96 @@
     }
   }
 
+  async function vendorPost(body: any) {
+    const res = await fetch('/api/vendor/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${vendorToken()}` },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+    return data;
+  }
+
   async function handleImport() {
     if (!vendor || detectedItems.length === 0) return;
-    for (const item of detectedItems) {
-      const productData = {
-        id: Date.now() + Math.random(),
-        vendorId: vendor.id,
-        name: item.name,
-        price: Number(item.price),
-        category: 'Imported',
-        description: item.description || `Verified item from ${vendor.store_name}.`,
-        imageUrl: item.imageUrl || `https://picsum.photos/400/600?random=${Math.random()}`
-      };
-      await addProductToSupabase(productData);
-      addProduct(productData);
+    try {
+      for (const item of detectedItems) {
+        await vendorPost({
+          name: item.name,
+          price: Number(item.price) || 0,
+          category: 'Imported',
+          description: item.description || `Verified item from ${vendor.store_name}.`,
+          image_url: item.imageUrl || ''
+        });
+      }
+      await syncWithNeuralGrid();
+      loadVendorData();
+      detectedItems = [];
+      isAnalysisMode = false;
+    } catch (err: any) {
+      alert('Import failed: ' + (err?.message || 'unknown error'));
     }
-    await syncWithNeuralGrid();
-    loadVendorData();
-    detectedItems = [];
-    isAnalysisMode = false;
   }
 
   async function handleAddManualProduct() {
     if (!vendor) return;
-    const pData = {
-      vendorId: vendor.id,
-      id: Date.now(),
-      name: newProduct.name,
-      price: Number(newProduct.price),
-      category: newProduct.category,
-      description: newProduct.description,
-      imageUrl: newProduct.imageUrl || `https://picsum.photos/800/1000?random=${Math.random()}`
-    };
-    await addProductToSupabase(pData);
-    addProduct(pData);
-    await syncWithNeuralGrid();
-    loadVendorData();
-    isAddingProduct = false;
-    newProduct = { name: '', price: '', category: 'General', description: '', imageUrl: '' };
-  }
-
-  function handleDelete(productId: number) {
-    if (confirm('Remove this neural asset from your catalog?')) {
-      deleteProduct(productId);
-      products = getProductsByVendor(Number(vendor.id));
+    try {
+      await vendorPost({
+        name: newProduct.name,
+        price: Number(newProduct.price),
+        category: newProduct.category,
+        description: newProduct.description,
+        image_url: newProduct.imageUrl || ''
+      });
+      await syncWithNeuralGrid();
+      loadVendorData();
+      isAddingProduct = false;
+      newProduct = { name: '', price: '', category: 'General', description: '', imageUrl: '' };
+    } catch (err: any) {
+      alert('Add failed: ' + (err?.message || 'unknown error'));
     }
   }
 
-  function handleLogin(e: Event) {
+  async function handleDelete(productId: number) {
+    if (!confirm('Remove this neural asset from your catalog? This is permanent.')) return;
+    try {
+      const res = await fetch(`/api/vendor/products?id=${productId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${vendorToken()}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      await syncWithNeuralGrid();
+      loadVendorData();
+    } catch (err: any) {
+      alert('Delete failed: ' + (err?.message || 'unknown error'));
+    }
+  }
+
+  async function handleLogin(e: Event) {
     e.preventDefault();
     isLoggingIn = true;
     loginError = null;
-    setTimeout(() => {
-      const allVendors = getVendors();
-      const found = allVendors.find((v: any) => v.email?.toLowerCase() === loginEmail.toLowerCase());
-      if (found) {
-        localStorage.setItem('aura_active_vendor_id', String(found.id));
-        localStorage.setItem('aura_active_vendor_email', found.email || '');
-        loadVendorData();
-        showLogin = false;
-      } else {
-        loginError = 'Neural node not found. Please verify your credentials or register.';
-      }
+    try {
+      const res = await fetch('/api/vendor/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Login failed');
+      localStorage.setItem('aura_active_vendor_id', String(data.vendor.id));
+      localStorage.setItem('aura_active_vendor_email', data.vendor.email || loginEmail);
+      localStorage.setItem('aura_vendor_token', data.token);
+      await syncWithNeuralGrid();
+      loadVendorData();
+      showLogin = false;
+    } catch (err: any) {
+      loginError = err?.message || 'Neural node authentication failed.';
+    } finally {
       isLoggingIn = false;
-    }, 1000);
+    }
   }
 </script>
 
@@ -207,6 +236,21 @@
                     required
                     bind:value={loginEmail}
                     placeholder="enter your corporate email"
+                    class="w-full bg-black/40 border border-white/10 rounded-2xl pl-16 pr-6 py-5 text-sm text-white focus:outline-none focus:border-aura-purple transition-all placeholder:text-gray-800"
+                  />
+                </div>
+              </div>
+              <div class="space-y-2">
+                <label class="text-[10px] text-gray-500 font-black uppercase tracking-widest px-1">Access Key (Password)</label>
+                <div class="relative group">
+                  <div class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-aura-purple transition-colors">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    bind:value={loginPassword}
+                    placeholder="vendor access key"
                     class="w-full bg-black/40 border border-white/10 rounded-2xl pl-16 pr-6 py-5 text-sm text-white focus:outline-none focus:border-aura-purple transition-all placeholder:text-gray-800"
                   />
                 </div>
