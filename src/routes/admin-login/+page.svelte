@@ -15,6 +15,7 @@
     setTimeout(() => {
       if (credentials.email === 'snehalatabestonline@gmail.com' && credentials.password === 'Snehalata26@&') {
         localStorage.setItem('aura_admin_token', 'aura_root_access_' + Date.now());
+        localStorage.setItem('aura_admin_pass', credentials.password);
         goto('/ceo-dashboard');
       } else {
         error = 'Invalid administrative credentials. Access denied by Aura Governance.';

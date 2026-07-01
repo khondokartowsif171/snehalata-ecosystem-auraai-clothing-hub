@@ -2,7 +2,9 @@
   import { browser } from '$app/environment';
   import { fade, slide, scale } from 'svelte/transition';
   import { TrendingUp, Users, ShoppingCart, Activity, Globe, Zap, ShieldCheck, ShieldAlert, Shield, Trash2, CheckCircle, XCircle, Plus, Search, Filter, RefreshCw, Package, Tag, Building2, BarChart3, CreditCard, Upload, Loader2, Image as ImageIcon, Network } from '@lucide/svelte';
-  import { getEcosystemStats, getVendors, getProducts, getOrders, getCategories, addProduct, deleteProduct, deleteVendor, deleteCategory, getOrderById, getLiveSales } from '$lib/mockData';
+  import { getEcosystemStats, getVendors, getProducts, getOrders, getCategories, addProduct, deleteProduct, deleteVendor, deleteCategory, getOrderById, getLiveSales, syncWithNeuralGrid } from '$lib/mockData';
+
+  const adminPass = () => (typeof localStorage !== 'undefined' ? localStorage.getItem('aura_admin_pass') || '' : '');
   import type { EcosystemStats, Vendor, Product, Category } from '$lib/types';
   import { BD_LOCATIONS } from '$lib/locationData';
 
@@ -103,31 +105,49 @@
     }
   }
 
-  function handleDeleteProduct(id: string | number) {
-    if (confirm('Delete this product from ecosystem?')) {
-      deleteProduct(id);
+  async function handleDeleteProduct(id: string | number) {
+    if (!confirm('Delete this product from the Neural Grid? This is permanent.')) return;
+    isLoading = true;
+    try {
+      const res = await fetch(`/api/admin/products?id=${id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-pass': adminPass() }
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || `HTTP ${res.status}`);
+      await syncWithNeuralGrid();
       loadData();
+    } catch (err: any) {
+      alert('Delete failed: ' + (err?.message || 'unknown error'));
+    } finally {
+      isLoading = false;
     }
   }
 
-  function handleAddProduct(e: Event) {
+  async function handleAddProduct(e: Event) {
     e.preventDefault();
     isLoading = true;
-    const finalImageUrl = newProduct.imageUrl || `https://picsum.photos/400/600?random=${Date.now()}`;
-    const productData = {
-      id: Date.now(),
-      vendorId: 1,
-      name: newProduct.name,
-      price: Number(newProduct.price),
-      category: newProduct.category,
-      description: newProduct.description,
-      imageUrl: finalImageUrl
-    };
-    addProduct(productData);
-    loadData();
-    isProductModalOpen = false;
-    newProduct = { name: '', price: '', category: '', description: '', imageUrl: '' };
-    isLoading = false;
+    try {
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass() },
+        body: JSON.stringify({
+          name: newProduct.name,
+          price: Number(newProduct.price),
+          category: newProduct.category,
+          description: newProduct.description,
+          image_url: newProduct.imageUrl || ''
+        })
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || `HTTP ${res.status}`);
+      await syncWithNeuralGrid();
+      loadData();
+      isProductModalOpen = false;
+      newProduct = { name: '', price: '', category: '', description: '', imageUrl: '' };
+    } catch (err: any) {
+      alert('Add failed: ' + (err?.message || 'unknown error'));
+    } finally {
+      isLoading = false;
+    }
   }
 
   function handleImageUpload(file: File) {
@@ -798,7 +818,7 @@
                       <label class="text-[8px] text-gray-500 font-black uppercase tracking-widest px-1">Taxonomy</label>
                       <select required bind:value={newProduct.category} class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-[11px] text-white focus:outline-none focus:border-aura-purple transition-all appearance-none cursor-pointer">
                         <option value="" class="bg-black text-white">Select Type</option>
-                        {#each ['Saree', 'Panjabi', 'Streetwear', 'Accessories', 'Heritage', 'Fusion'] as c}
+                        {#each ['Saree', 'Panjabi', 'Three-Piece', 'T-Shirt', 'Pant', 'Baby', 'Hoodie', 'Others'] as c}
                           <option value={c} class="bg-black text-white">{c}</option>
                         {/each}
                       </select>
