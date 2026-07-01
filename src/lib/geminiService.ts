@@ -13,9 +13,14 @@ export interface SearchIntent {
 const buildAuraStrings = () => {
   const products = getProducts();
   const vendors = getVendors();
-  
-  const productString = products.map(p => `- [ID:${p.id}] ${p.name} (৳${p.price}) - ${p.category} [Vendor ID: ${p.vendorId}]`).join('\n');
-  const vendorString = vendors.map(v => `- [Vendor:${v.id}] ${v.name} (${v.status}) - ${v.description}`).join('\n');
+  const vendorName = (id: number) => vendors.find(v => v.id === id)?.store_name || 'Independent Artisan';
+
+  const productString = products
+    .map(p => `- [ID:${p.id}] ${p.name} — ৳${p.price} — ${p.category} — by ${vendorName(p.vendorId)}${p.description ? ` — ${p.description.slice(0, 90)}` : ''}`)
+    .join('\n');
+  const vendorString = vendors
+    .map(v => `- [Vendor:${v.id}] ${v.store_name} (${v.status})${v.district ? ` — ${v.district}` : ''}${v.description ? ` — ${v.description.slice(0, 90)}` : ''}`)
+    .join('\n');
 
   return { productString, vendorString };
 };
