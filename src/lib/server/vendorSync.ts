@@ -4,6 +4,7 @@ import { env as pub } from '$env/dynamic/public';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as gemini from '$lib/server/gemini.server';
+import { withTimeout } from '$lib/seedCatalog';
 
 export function adminClient(): SupabaseClient {
   const url = pub.PUBLIC_SUPABASE_URL;
@@ -29,20 +30,17 @@ async function scrapeProducts(url: string) {
   });
   const $ = cheerio.load(resp.data);
   $('script, style, noscript, iframe, svg').remove();
-  const body = ($('body').html() || '').substring(0, 30000);
+  const body = ($('body').html() || '').substring(0, 18000);
 
-  // Gemini preview models can return transient 503s under load — retry a few times.
-  let lastErr: unknown;
-  for (let i = 0; i < 3; i++) {
-    try {
-      const result = await gemini.analyzeWebsiteProducts(body);
-      return result?.products || [];
-    } catch (e) {
-      lastErr = e;
-      await new Promise((r) => setTimeout(r, 2500 * (i + 1)));
-    }
+  // Gemini preview models can be slow or 503 under load. Bound each attempt so a
+  // hung call can't blow the 60s function budget; degrade to [] (next sync/cron
+  // retries) rather than crashing.
+  for (let i = 0; i < 2; i++) {
+    const result = await withTimeout(gemini.analyzeWebsiteProducts(body), 22000);
+    if (result) return result.products || [];
+    await new Promise((r) => setTimeout(r, 1500));
   }
-  throw lastErr;
+  return [];
 }
 
 /**
