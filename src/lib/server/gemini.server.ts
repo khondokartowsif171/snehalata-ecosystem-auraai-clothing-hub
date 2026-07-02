@@ -266,6 +266,33 @@ export const auditVendorDescription = async (shopName: string, description: stri
     return JSON.parse(response.text || '{"status": "REJECTED", "reason": "Audit failed"}');
 };
 
+// A3 — semantic search: embed text into a 768-d vector (text-embedding-004).
+export const embedText = async (text: string): Promise<number[] | null> => {
+    try {
+        const res: any = await ai.models.embedContent({ model: 'text-embedding-004', contents: text });
+        const vals = res?.embeddings?.[0]?.values || res?.embedding?.values;
+        return Array.isArray(vals) && vals.length ? vals : null;
+    } catch {
+        return null;
+    }
+};
+
+// A3 — visual search: turn an uploaded photo into a searchable text description,
+// which we then embed into the same vector space as the catalog.
+export const captionImage = async (base64Image: string): Promise<string> => {
+    const data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
+    const r = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: {
+            parts: [
+                { inlineData: { data, mimeType: 'image/jpeg' } },
+                { text: 'Describe this clothing item in 15-25 words for a shopping search: garment type, fabric, colour, pattern and style. Output only the description text.' }
+            ]
+        }
+    });
+    return (r.text || '').trim();
+};
+
 // A6 — governance: moderate a product listing before it goes live.
 export const moderateListing = async (name: string, description: string, price: number, category: string) => {
     const response = await ai.models.generateContent({

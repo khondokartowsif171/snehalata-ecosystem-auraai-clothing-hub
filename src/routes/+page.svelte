@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { fade, fly, scale } from 'svelte/transition';
-  import { Search, LayoutGrid, Tag, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, ShoppingBag, Menu, X, Filter, Globe, Store, Feather, Gem, Scissors, Flower2, History } from '@lucide/svelte';
+  import { Search, LayoutGrid, Tag, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, ShoppingBag, Menu, X, Filter, Globe, Store, Feather, Gem, Scissors, Flower2, History, Camera, Loader2, Sparkles } from '@lucide/svelte';
   import ProductCard from '$lib/components/ProductCard.svelte';
   import { getProducts, getVendors, getEcosystemStats } from '$lib/mockData';
   import { BD_LOCATIONS } from '$lib/locationData';
@@ -33,6 +33,68 @@
   let selectedDistrict = $state('all');
   let searchQuery = $state('');
   let isSidebarOpen = $state(false);
+
+  // Neural Grid A3 — semantic + visual "search by photo".
+  let semanticActive = $state(false);
+  let semanticResults = $state<any[]>([]);
+  let semanticCaption = $state('');
+  let searchLoading = $state(false);
+
+  async function runSemanticSearch() {
+    const q = searchQuery.trim();
+    if (!q) { semanticActive = false; return; }
+    searchLoading = true;
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q })
+      });
+      const d = await res.json().catch(() => ({}));
+      semanticResults = d.products || [];
+      semanticCaption = '';
+      semanticActive = true;
+    } catch {
+      semanticActive = false; // fall back to the client-side keyword filter
+    } finally {
+      searchLoading = false;
+    }
+  }
+
+  async function runVisualSearch(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    searchLoading = true;
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onloadend = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const res = await fetch('/api/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 })
+      });
+      const d = await res.json().catch(() => ({}));
+      semanticResults = d.products || [];
+      semanticCaption = d.caption || '';
+      semanticActive = true;
+      track('search', { meta: { mode: 'visual' } });
+    } catch {
+      semanticActive = false;
+    } finally {
+      searchLoading = false;
+      input.value = '';
+    }
+  }
+
+  function clearSemantic() {
+    semanticActive = false;
+    semanticResults = [];
+    semanticCaption = '';
+    searchQuery = '';
+  }
   // Seeded from the server load so the grid renders during SSR / first paint.
   let products = $state<any[]>(data?.products ?? []);
   let vendors = $state<any[]>(data?.vendors ?? []);
@@ -131,6 +193,9 @@
     const matchesDistrict = selectedDistrict === 'all' || vendor?.district === selectedDistrict;
     return matchesCat && matchesSearch && matchesDistrict;
   }));
+
+  // When a neural (semantic/visual) search is active, show those ranked results instead.
+  let displayProducts = $derived(semanticActive ? semanticResults : filteredProducts);
 
   let categoryVendors = $derived(vendors.filter(v => {
     const matchesDistrict = selectedDistrict === 'all' || v.district === selectedDistrict;
@@ -274,8 +339,18 @@
       <div class="flex-1 relative group">
         <Search class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#7c3aed] transition-colors" size={20} />
         <input type="text" bind:value={searchQuery} oninput={onSearchInput}
-          placeholder="SNEHALATA Aura AI-তে সার্চ করুন..."
-          class="w-full bg-white/5 border border-white/10 rounded-[2rem] py-4 pl-16 pr-6 text-sm focus:outline-none focus:border-[#7c3aed]/50 focus:ring-8 focus:ring-[#7c3aed]/5 transition-all placeholder:text-gray-600" />
+          onkeydown={(e) => e.key === 'Enter' && runSemanticSearch()}
+          placeholder="Neural search — describe what you want, or tap the camera"
+          class="w-full bg-white/5 border border-white/10 rounded-[2rem] py-4 pl-16 pr-28 text-sm focus:outline-none focus:border-[#7c3aed]/50 focus:ring-8 focus:ring-[#7c3aed]/5 transition-all placeholder:text-gray-600" />
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+          <label class="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-aura-gold text-gray-400 hover:text-aura-gold transition-all cursor-pointer" title="Search by photo">
+            <input type="file" accept="image/*" onchange={runVisualSearch} class="hidden" disabled={searchLoading} />
+            {#if searchLoading}<Loader2 size={16} class="animate-spin" />{:else}<Camera size={16} />{/if}
+          </label>
+          <button onclick={runSemanticSearch} aria-label="Neural search" class="p-2.5 rounded-xl bg-[#7c3aed] text-white hover:bg-white hover:text-black transition-all cursor-pointer">
+            <Sparkles size={16} />
+          </button>
+        </div>
       </div>
       <div class="hidden md:flex items-center gap-4">
         <div class="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
@@ -320,8 +395,26 @@
 
     <!-- Main Content -->
     <main class="flex-1 p-6 lg:p-12">
+      <!-- Neural Grid A3 — semantic/visual search results banner -->
+      {#if semanticActive}
+        <section class="mb-10">
+          <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-[#7c3aed]/15 to-aura-gold/10 border border-white/10">
+            <div class="flex items-center gap-3">
+              <div class="p-2.5 rounded-xl bg-[#7c3aed]/20 text-[#7c3aed]"><Sparkles size={16} /></div>
+              <div>
+                <p class="text-sm font-black">Neural results · {semanticResults.length} matches</p>
+                {#if semanticCaption}<p class="text-[10px] text-gray-400 mt-0.5 italic">From your photo: “{semanticCaption}”</p>{/if}
+              </div>
+            </div>
+            <button onclick={clearSemantic} class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all cursor-pointer">
+              <X size={14} /> Clear
+            </button>
+          </div>
+        </section>
+      {/if}
+
       <!-- Neural Grid A7 — real trending rail -->
-      {#if selectedCategory === 'all' && searchQuery === '' && trending.length > 0}
+      {#if !semanticActive && selectedCategory === 'all' && searchQuery === '' && trending.length > 0}
         <section class="mb-16">
           <div class="flex items-center gap-4 mb-8">
             <div class="p-3 bg-aura-gold/10 rounded-2xl text-aura-gold"><TrendingUp size={16} /></div>
@@ -339,7 +432,7 @@
       {/if}
 
       <!-- Neural Grid A2 — behavioral "For You" rail -->
-      {#if selectedCategory === 'all' && searchQuery === '' && recentlyViewed.length > 0}
+      {#if !semanticActive && selectedCategory === 'all' && searchQuery === '' && recentlyViewed.length > 0}
         <section class="mb-16">
           <div class="flex items-center gap-4 mb-8">
             <div class="p-3 bg-aura-purple/10 rounded-2xl text-aura-purple"><History size={16} /></div>
@@ -362,7 +455,7 @@
             {selectedCategory === 'all' ? 'Neural Collection' : ECO_CATEGORIES.find(c => c.id === selectedCategory)?.name}
           </h2>
           <span class="h-px w-12 bg-white/10 hidden sm:block"></span>
-          <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">{filteredProducts.length} Neural Items</span>
+          <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">{displayProducts.length} Neural Items</span>
         </div>
         <div class="flex items-center gap-3">
           <div class="hidden sm:flex -space-x-4">
@@ -420,7 +513,7 @@
       {/if}
 
       <!-- Category Sections (All) -->
-      {#if selectedCategory === 'all' && searchQuery === ''}
+      {#if !semanticActive && selectedCategory === 'all' && searchQuery === ''}
         <div class="space-y-32 mb-32">
           {#each ECO_CATEGORIES.filter(c => c.id !== 'all').slice(0, 4) as cat}
             {@const catProducts = products.filter(p => p.category.toLowerCase().includes(cat.id)).slice(0, 4)}
@@ -453,13 +546,13 @@
 
       <!-- Product Grid -->
       <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-10">
-        {#each filteredProducts as p, idx (p.id)}
+        {#each displayProducts as p, idx (p.id)}
           <div transition:fly={{ y: 30, duration: 400, delay: idx * 50 }}>
             <ProductCard product={p} vendor={vendors.find(v => v.id === p.vendorId)} />
           </div>
         {/each}
 
-        {#if filteredProducts.length === 0}
+        {#if displayProducts.length === 0}
           <div class="col-span-full py-40 text-center">
             <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-white/10">
               <Search size={32} class="text-gray-800" />
@@ -470,7 +563,7 @@
         {/if}
       </div>
 
-      {#if filteredProducts.length > 0}
+      {#if !semanticActive && filteredProducts.length > 0}
         <div class="mt-32 text-center border-t border-white/5 pt-20">
           <button class="group px-12 py-5 bg-[#0A0A0A] border border-white/10 rounded-[2rem] hover:border-[#7c3aed] transition-all duration-700 relative overflow-hidden inline-flex items-center gap-4 cursor-pointer">
             <span class="relative z-10 text-[11px] font-black uppercase tracking-[0.4em] text-white">Load More Decrypted Artifacts</span>

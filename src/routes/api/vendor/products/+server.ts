@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
 import { env as pub } from '$env/dynamic/public';
-import { moderateListing } from '$lib/server/gemini.server';
+import { moderateListing, embedText } from '$lib/server/gemini.server';
 import { withTimeout } from '$lib/seedCatalog';
 import type { RequestHandler } from './$types';
 
@@ -73,6 +73,17 @@ export const POST: RequestHandler = async ({ request }) => {
     }
   } catch {
     /* moderation columns not migrated yet, or Gemini offline — ignore */
+  }
+
+  // A3 — embed the new listing so it's searchable immediately (best-effort).
+  try {
+    const emb = await withTimeout(
+      embedText([row.name, row.category, row.description].filter(Boolean).join('. ')),
+      10000
+    );
+    if (emb) await admin.from('products').update({ embedding: `[${emb.join(',')}]` }).eq('id', data.id);
+  } catch {
+    /* embedding column not migrated yet — the backfill endpoint will catch it */
   }
 
   return json({ ok: true, product: data, moderation });
