@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { fade, fly, scale } from 'svelte/transition';
-  import { Search, LayoutGrid, Tag, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, ShoppingBag, Menu, X, Filter, Globe, Store } from '@lucide/svelte';
+  import { Search, LayoutGrid, Tag, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, ShoppingBag, Menu, X, Filter, Globe, Store, Feather, Gem, Scissors, Flower2 } from '@lucide/svelte';
   import ProductCard from '$lib/components/ProductCard.svelte';
   import { getProducts, getVendors, getEcosystemStats } from '$lib/mockData';
   import { BD_LOCATIONS } from '$lib/locationData';
@@ -112,6 +112,14 @@
     { id: 'market', name: 'মার্কেট প্লেস (Market)', icon: TrendingUp },
     { id: 'others', name: 'অন্যান্য (Others)', icon: Tag }
   ];
+
+  // Heritage craft pillars — the premium-heritage story (bn + en), gold-accented.
+  const HERITAGE_CRAFTS = [
+    { bn: 'জামদানি', en: 'Jamdani', story: 'UNESCO-listed Dhakai muslin motifs, handwoven thread by thread.', icon: Feather },
+    { bn: 'মসলিন', en: 'Muslin', story: 'The legendary feather-light weave of Bengal, reborn for today.', icon: Gem },
+    { bn: 'নকশি কাঁথা', en: 'Nakshi Kantha', story: 'Story-stitched quilts from rural artisan hands.', icon: Scissors },
+    { bn: 'তাঁত ও সিল্ক', en: 'Tangail & Rajshahi Silk', story: 'Lustrous silk traditions woven across generations.', icon: Flower2 }
+  ];
 </script>
 
 <svelte:head>
@@ -143,7 +151,7 @@
   {@html `<script type="application/ld+json">${jsonLd}<\/script>`}
 </svelte:head>
 
-<div class="min-h-screen bg-[#050505] text-white selection:bg-[#7c3aed]/30 font-sans">
+<div class="min-h-screen bg-[#060507] text-white selection:bg-[#7c3aed]/30 font-sans">
   <!-- Hero -->
   <section class="relative overflow-hidden border-b border-white/5">
     <div class="absolute inset-0 bg-gradient-to-b from-[#7c3aed]/15 via-transparent to-transparent pointer-events-none"></div>
@@ -181,6 +189,39 @@
           <div class="text-xl sm:text-3xl md:text-4xl font-black text-white tabular-nums">{Math.round(stats.aiInteractions / 1000)}K+</div>
           <div class="text-[10px] font-black uppercase tracking-widest text-gray-500 mt-1">AI Interactions</div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Heritage Story Strip -->
+  <section class="border-b border-white/5 bg-gradient-to-b from-[#0b0a0d] to-[#060507]">
+    <div class="max-w-7xl mx-auto px-6 py-16 sm:py-20">
+      <div class="flex items-center gap-4 mb-4">
+        <span class="h-px w-10 bg-aura-gold/60"></span>
+        <span class="text-[10px] font-black uppercase tracking-[0.4em] text-aura-gold">Heritage of Bengal</span>
+      </div>
+      <h2 class="text-3xl sm:text-4xl font-serif font-black italic mb-4 max-w-3xl leading-tight">
+        শতাব্দীর <span class="text-aura-gold">তাঁত ও কারুশিল্প</span>, বিশ্বমানে
+      </h2>
+      <p class="text-gray-400 text-sm sm:text-base max-w-2xl leading-relaxed mb-12">
+        Every artifact carries a lineage — woven, stitched and dyed by verified Bangladeshi artisans, then elevated by the Aura Neural Engine.
+      </p>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {#each HERITAGE_CRAFTS as craft}
+          <div class="group relative p-6 sm:p-8 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-aura-gold/40 transition-all duration-500 overflow-hidden">
+            <div class="absolute -right-8 -bottom-8 text-aura-gold/[0.06] group-hover:text-aura-gold/10 transition-colors pointer-events-none">
+              <svelte:component this={craft.icon} size={120} />
+            </div>
+            <div class="relative z-10">
+              <div class="w-12 h-12 rounded-2xl bg-aura-gold/10 border border-aura-gold/20 flex items-center justify-center text-aura-gold mb-5">
+                <svelte:component this={craft.icon} size={20} />
+              </div>
+              <h3 class="text-lg font-serif font-black italic text-white mb-0.5">{craft.bn}</h3>
+              <p class="text-[10px] font-black uppercase tracking-widest text-aura-gold/80 mb-3">{craft.en}</p>
+              <p class="text-xs text-gray-500 leading-relaxed">{craft.story}</p>
+            </div>
+          </div>
+        {/each}
       </div>
     </div>
   </section>
