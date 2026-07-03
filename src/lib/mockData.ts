@@ -38,35 +38,36 @@ let remoteCategories: Category[] = [];
 
 export const syncWithNeuralGrid = async () => {
   if (!browser) return;
-  if (!supabase) return;
 
+  // The project's legacy anon key is disabled, so we can't read Supabase directly
+  // from the browser. Fetch the live catalog through the service_role-backed
+  // /api/catalog endpoint instead (falls back to seed if it fails).
   try {
-    const { data: cData } = await fetchCategoriesFromSupabase();
-    if (cData) {
-      remoteCategories = cData.map((c: any) => ({
+    const res = await fetch('/api/catalog');
+    const d = await res.json().catch(() => ({}));
+
+    if (Array.isArray(d?.categories)) {
+      remoteCategories = d.categories.map((c: any) => ({
         id: c.id,
         name: c.name,
         slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
         description: c.description
       }));
     }
-
-    const { data: vData } = await fetchVendorsFromSupabase();
-    if (vData) {
-      remoteVendors = vData.map(mapVendorRow);
-      MOCK_STATS.totalVendors = remoteVendors.length + INITIAL_VENDORS.length;
+    if (Array.isArray(d?.vendors)) {
+      remoteVendors = d.vendors.map(mapVendorRow);
+      MOCK_STATS.totalVendors = remoteVendors.length;
     }
-
-    const { data: pData } = await fetchProductsFromSupabase();
-    if (pData) {
-      remoteProducts = pData.map(mapProductRow);
-      MOCK_STATS.activeProducts = remoteProducts.length + INITIAL_PRODUCTS.length;
+    if (Array.isArray(d?.products)) {
+      remoteProducts = d.products.map(mapProductRow);
+      MOCK_STATS.activeProducts = remoteProducts.length;
     }
   } catch (err) {
-    console.warn("Sync failed partially.", err);
+    console.warn('Sync failed.', err);
   }
 
   if (browser) window.dispatchEvent(new Event('productUpdated'));
+  if (browser) window.dispatchEvent(new Event('vendorUpdated'));
 };
 
 const INITIAL_ORDERS: Order[] = [

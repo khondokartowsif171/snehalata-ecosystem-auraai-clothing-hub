@@ -1,11 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { env } from '$env/dynamic/private';
+import { env as pub } from '$env/dynamic/public';
 
-const supabaseUrl = PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// SERVER-ONLY. Uses the service_role key (never shipped to the browser). The
+// project's legacy anon key is disabled, so anon reads 401 — all server-side
+// storefront reads must go through service_role. Public reads are still safe
+// because these helpers only ever SELECT storefront-safe columns/rows.
+const supabaseUrl = pub.PUBLIC_SUPABASE_URL || '';
+const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-export const supabase = supabaseUrl && supabaseKey
-  ? createClient(supabaseUrl, supabaseKey)
+export const supabase = supabaseUrl && serviceKey
+  ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
   : null;
 
 export const fetchVendorsFromSupabase = async () => {
@@ -22,14 +27,4 @@ export const fetchProductsFromSupabase = async () => {
 export const fetchCategoriesFromSupabase = async () => {
   if (!supabase) return { data: null, error: new Error('Supabase not configured') };
   return supabase.from('categories').select('*');
-};
-
-export const addVendorToSupabase = async (vendor: any) => {
-  if (!supabase) return { data: null, error: new Error('Supabase not configured') };
-  return supabase.from('vendors').insert(vendor);
-};
-
-export const addProductToSupabase = async (product: any) => {
-  if (!supabase) return { data: null, error: new Error('Supabase not configured') };
-  return supabase.from('products').insert(product);
 };
