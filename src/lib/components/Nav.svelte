@@ -40,7 +40,7 @@
         <LayoutGrid size={14} /> Hub
       </a>
       <a href="/studio" class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] py-1 border-b-2 transition-all duration-300 {$page.url.pathname === '/studio' ? 'border-aura-purple text-aura-purple' : 'text-gray-500 border-transparent hover:text-white hover:-translate-y-px'}">
-        <Sparkles size={14} /> Studio
+        <Sparkles size={14} /> Aura Studio
       </a>
       <a href="/orders" class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] py-1 border-b-2 transition-all duration-300 {$page.url.pathname.startsWith('/orders') ? 'border-aura-purple text-aura-purple' : 'text-gray-500 border-transparent hover:text-white hover:-translate-y-px'}">
         <History size={14} /> History
@@ -73,7 +73,7 @@
             <span class="absolute -top-2 -right-2 bg-[#7c3aed] text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold border border-black shadow-lg">{cartCount}</span>
           {/if}
         </a>
-        <button onclick={() => isMobileOpen = !isMobileOpen} class="lg:hidden text-white cursor-pointer">
+        <button type="button" onclick={() => isMobileOpen = !isMobileOpen} class="lg:hidden text-white cursor-pointer p-1 -m-1">
           {#if isMobileOpen}
             <X size={24} />
           {:else}
@@ -93,7 +93,7 @@
         </a>
         <a href="/studio" onclick={() => isMobileOpen = false} class="flex items-center gap-2 text-sm font-black uppercase tracking-wider"
            class:text-aura-purple={$page.url.pathname === '/studio'} class:text-gray-400={$page.url.pathname !== '/studio'}>
-          <Sparkles size={16} /> Studio
+          <Sparkles size={16} /> Aura Studio
         </a>
         <a href="/orders" onclick={() => isMobileOpen = false} class="flex items-center gap-2 text-sm font-black uppercase tracking-wider"
            class:text-aura-purple={$page.url.pathname.startsWith('/orders')} class:text-gray-400={!$page.url.pathname.startsWith('/orders')}>

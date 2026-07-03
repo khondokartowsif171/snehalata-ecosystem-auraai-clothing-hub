@@ -5,6 +5,7 @@
   import ProductCard from '$lib/components/ProductCard.svelte';
   import { analyzeWebsiteProducts } from '$lib/geminiService';
   import { getVendors, getProductsByVendor, syncWithNeuralGrid } from '$lib/mockData';
+  import { fileToCompressedDataURL } from '$lib/imageUpload';
   import type { Vendor } from '$lib/types';
 
   const vendorToken = () => (typeof localStorage !== 'undefined' ? localStorage.getItem('aura_vendor_token') || '' : '');
@@ -55,12 +56,7 @@
     if (!file) return;
     merchLoading = true; merchQuality = null; merchNote = '';
     try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onloadend = () => res(r.result as string);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
+      const base64 = await fileToCompressedDataURL(file);
       const resp = await fetch('/api/vendor/merchandise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${vendorToken()}` },

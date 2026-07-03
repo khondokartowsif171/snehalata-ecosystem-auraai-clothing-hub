@@ -5,6 +5,7 @@
   import { getProducts } from '$lib/mockData';
   import { generateTryOnTransformation, generateStyleSuggestion } from '$lib/geminiService';
   import { track } from '$lib/analytics';
+  import { fileToCompressedDataURL } from '$lib/imageUpload';
   import type { Product } from '$lib/types';
 
   let allProducts = $state<Product[]>([]);
@@ -45,19 +46,17 @@
     });
   }
 
-  function processFile(file: File, type: 'user' | 'product') {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (type === 'user') {
-        userImage = reader.result as string;
-      } else {
-        productImage = reader.result as string;
-        product = undefined;
-      }
-      generatedImage = null;
-      error = null;
-    };
-    reader.readAsDataURL(file);
+  async function processFile(file: File, type: 'user' | 'product') {
+    // Downscale before use so phone-camera photos stay under the serverless body limit.
+    const dataUrl = await fileToCompressedDataURL(file);
+    if (type === 'user') {
+      userImage = dataUrl;
+    } else {
+      productImage = dataUrl;
+      product = undefined;
+    }
+    generatedImage = null;
+    error = null;
   }
 
   function handleImageUpload(e: Event, type: 'user' | 'product') {
