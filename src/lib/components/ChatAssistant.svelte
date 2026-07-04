@@ -1,8 +1,18 @@
 <script lang="ts">
-  import { MessageSquare, X, Sparkles, Bot, User, Loader2, Cpu, Download, Image as ImageIcon, Trash2, ArrowUp } from '@lucide/svelte';
-  import { generateAuraImage, generateAuraResponse, resetAuraChat } from '$lib/geminiService';
+  import { MessageSquare, X, Sparkles, Bot, User, Loader2, Cpu, Download, Image as ImageIcon, Trash2, ArrowUp, Paperclip } from '@lucide/svelte';
+  import { generateAuraImage, generateAuraResponse, editAuraImage, resetAuraChat } from '$lib/geminiService';
+  import { fileToCompressedDataURL } from '$lib/imageUpload';
   import { fade, fly, scale } from 'svelte/transition';
   import type { ChatMessage } from '$lib/types';
+
+  let attachedImage = $state<string | null>(null);
+
+  async function handleImageAttach(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) attachedImage = await fileToCompressedDataURL(file);
+    input.value = '';
+  }
 
   let { embedded = false, className = '' }: { embedded?: boolean; className?: string } = $props();
 
@@ -51,15 +61,29 @@
   }
 
   async function handleSendMessage() {
-    if (!input.trim() || isTyping || isGeneratingImage) return;
+    if ((!input.trim() && !attachedImage) || isTyping || isGeneratingImage) return;
 
-    const userMsg: ChatMessage = { id: Date.now().toString(), text: input, sender: 'user' };
-    const currentInput = input;
+    const currentInput = input.trim();
+    const img = attachedImage;
+    const userMsg: ChatMessage = { id: Date.now().toString(), text: currentInput || 'এই ছবিটি এডিট করে দাও', sender: 'user', image: img || undefined };
     messages = [...messages, userMsg];
     input = '';
+    attachedImage = null;
     isTyping = true;
 
     try {
+      // Uploaded photo → AI edit / restyle (Aura Vision). Full product Try-On lives in Aura Studio.
+      if (img) {
+        isGeneratingImage = true;
+        const instruction = currentInput || 'Enhance this clothing/outfit photo: clean studio background, soft even lighting, keep the garment realistic and flattering.';
+        const edited = await editAuraImage(instruction, img);
+        messages = [...messages, edited
+          ? { id: Date.now().toString(), text: 'এই যে আপনার ছবিটি Aura Vision দিয়ে এডিট করে দিলাম ✨ (পুরো Virtual Try-On করতে Aura Studio ব্যবহার করুন।)', sender: 'aura', image: edited }
+          : { id: Date.now().toString(), text: 'ছবিটি এই মুহূর্তে এডিট করা যাচ্ছে না — Aura একটু ব্যস্ত, একটু পরে আবার চেষ্টা করুন 🙏', sender: 'aura' }];
+        isGeneratingImage = false; isTyping = false;
+        return;
+      }
+
       if (isImageRequest(currentInput)) {
         isGeneratingImage = true;
         const imageUrl = await generateAuraImage(currentInput);
@@ -200,12 +224,23 @@
       </div>
 
       <form onsubmit={(e) => { e.preventDefault(); handleSendMessage(); }} class="p-4 bg-white/5 border-t border-white/5 shrink-0">
+        {#if attachedImage}
+          <div class="mb-2 flex items-center gap-2" transition:fade={{ duration: 150 }}>
+            <img src={attachedImage} class="w-11 h-11 rounded-lg object-cover border border-white/10" alt="attached" />
+            <span class="text-[9px] text-[#7c3aed] uppercase tracking-widest font-black">Photo attached — send to edit ✨</span>
+            <button type="button" onclick={() => attachedImage = null} class="ml-auto text-gray-500 hover:text-red-400 cursor-pointer"><X size={14} /></button>
+          </div>
+        {/if}
         <div class="relative flex items-center">
+          <label class="absolute left-2 w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer text-gray-500 hover:text-[#7c3aed] transition-colors" title="Attach a photo to edit">
+            <input type="file" accept="image/*" onchange={handleImageAttach} class="hidden" />
+            <Paperclip size={16} />
+          </label>
           <input type="text" bind:value={input}
-            placeholder="Ask Aura or generate art..."
-            class="w-full bg-black/40 border border-white/10 rounded-2xl pl-4 pr-12 py-3.5 text-[11px] text-white focus:outline-none focus:border-[#7c3aed]/50 transition-all placeholder:text-gray-600 font-medium tracking-wide shadow-inner" />
-          <button type="submit" disabled={!input.trim() || isTyping || isGeneratingImage}
-            class="absolute right-2 w-8 h-8 rounded-xl transition-all duration-300 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed {(input.trim() && !isTyping && !isGeneratingImage) ? 'bg-[#7c3aed] text-white' : 'text-gray-600 bg-transparent'}">
+            placeholder="Ask Aura, or attach a photo to edit..."
+            class="w-full bg-black/40 border border-white/10 rounded-2xl pl-11 pr-12 py-3.5 text-[11px] text-white focus:outline-none focus:border-[#7c3aed]/50 transition-all placeholder:text-gray-600 font-medium tracking-wide shadow-inner" />
+          <button type="submit" disabled={(!input.trim() && !attachedImage) || isTyping || isGeneratingImage}
+            class="absolute right-2 w-8 h-8 rounded-xl transition-all duration-300 flex items-center justify-center cursor-pointer disabled:cursor-not-allowed {((input.trim() || attachedImage) && !isTyping && !isGeneratingImage) ? 'bg-[#7c3aed] text-white' : 'text-gray-600 bg-transparent'}">
             {#if isTyping || isGeneratingImage}
               <Loader2 size={14} class="animate-spin" />
             {:else}
