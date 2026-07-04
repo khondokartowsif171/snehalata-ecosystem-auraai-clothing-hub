@@ -19,8 +19,8 @@
     DELIVERED: 'ডেলিভারড'
   };
 
-  async function fetchOrder(id: string) {
-    loading = true;
+  async function fetchOrder(id: string, silent = false) {
+    if (!silent) loading = true;
     error = '';
     try {
       const res = await fetch(`/api/orders/track?id=${encodeURIComponent(id)}`);
@@ -53,7 +53,15 @@
 
   $effect(() => {
     const orderId = $page.params.orderId;
-    if (orderId) fetchOrder(orderId);
+    if (!orderId) return;
+    fetchOrder(orderId);
+    // Real-time: silently re-poll status every 25s until delivered/cancelled, so
+    // admin status changes appear without the customer refreshing.
+    const iv = setInterval(() => {
+      if (order && (order.currentStatus === 'DELIVERED' || order.currentStatus === 'CANCELLED')) return;
+      fetchOrder(orderId, true);
+    }, 25000);
+    return () => clearInterval(iv);
   });
 
   function handleSearch(e: Event) {

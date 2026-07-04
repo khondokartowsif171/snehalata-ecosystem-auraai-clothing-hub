@@ -25,7 +25,7 @@
   }
 </script>
 
-<nav class="sticky top-0 z-50 bg-[#060507]/85 backdrop-blur-3xl border-b border-white/5 shadow-2xl">
+<nav class="sticky top-0 z-50 bg-[#060507]/95 backdrop-blur-lg border-b border-white/5 shadow-2xl">
   <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
     <a href="/" class="flex items-center gap-4 group">
       <Logo />

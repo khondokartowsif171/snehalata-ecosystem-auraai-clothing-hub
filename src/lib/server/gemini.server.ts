@@ -376,7 +376,7 @@ export const embedText = async (text: string): Promise<number[] | null> => {
 // which we then embed into the same vector space as the catalog.
 export const captionImage = async (base64Image: string): Promise<string> => {
     const data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
-    const r = await ai.models.generateContent({
+    const r = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
             parts: [
@@ -384,7 +384,7 @@ export const captionImage = async (base64Image: string): Promise<string> => {
                 { text: 'Describe this clothing item in 15-25 words for a shopping search: garment type, fabric, colour, pattern and style. Output only the description text.' }
             ]
         }
-    });
+    }));
     return (r.text || '').trim();
 };
 

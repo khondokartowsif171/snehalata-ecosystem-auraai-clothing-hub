@@ -85,6 +85,13 @@
       cartItems = [];
       window.dispatchEvent(new Event('cartUpdated'));
       completedOrderId = data.orderId;
+      // Persist the order so the customer keeps a real-time tracking record (their
+      // lightweight identity = their saved orders, keyed by phone + order id).
+      try {
+        const mine = JSON.parse(localStorage.getItem('aura_my_orders') || '[]');
+        mine.unshift({ id: data.orderId, phone: formData.phone, name: formData.name, total: data.total, at: new Date().toISOString() });
+        localStorage.setItem('aura_my_orders', JSON.stringify(mine.slice(0, 50)));
+      } catch { /* ignore storage errors */ }
       checkoutStep = 'DONE';
     } catch (e: any) {
       error = e?.message || 'Could not place order. Please try again.';
@@ -113,10 +120,19 @@
       <CheckCircle2 size={40} class="text-green-500" />
     </div>
     <h1 class="text-3xl font-bold text-gray-900 mb-2">Order Received!</h1>
-    <p class="text-gray-500 mb-8 tracking-widest text-[10px] uppercase font-black">Reference: ORD-{completedOrderId}</p>
-    <a href="/" class="px-10 py-4 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-aura-purple transition-all inline-block">
-      Continue Shopping
-    </a>
+    <p class="text-gray-500 mb-5 text-sm max-w-xs">Save your Tracking ID to follow your order in real-time.</p>
+    <div class="mb-8 px-8 py-4 bg-gray-50 border border-gray-200 rounded-2xl">
+      <p class="text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 mb-1">Your Tracking ID</p>
+      <p class="text-3xl font-black text-aura-purple tracking-tight tabular-nums">ORD-{completedOrderId}</p>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+      <a href={`/tracking/${completedOrderId}`} class="flex-1 px-6 py-4 bg-aura-purple text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-900 transition-all">
+        Track My Order
+      </a>
+      <a href="/" class="flex-1 px-6 py-4 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-aura-purple transition-all">
+        Continue Shopping
+      </a>
+    </div>
   </div>
 {:else}
   <div class="min-h-screen bg-[#faf6ee] pb-32 pt-24 font-sans text-[#1b1410]">

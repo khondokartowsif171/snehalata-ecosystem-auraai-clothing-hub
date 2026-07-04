@@ -97,8 +97,8 @@
   <div onclick={openModal}
     class="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden bg-white/5 border border-white/5 group-hover:border-aura-gold/40 transition-all duration-500 shadow-xl cursor-pointer">
     
-    <img src={currentImageUrl} alt={product.name}
-      class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 grayscale-[0.2] group-hover:grayscale-0" />
+    <img src={currentImageUrl} alt={product.name} loading="lazy" decoding="async"
+      class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
 
     {#if isRefining}
       <div class="absolute inset-0 bg-black/60 backdrop-blur-md z-30 flex flex-col items-center justify-center gap-4">

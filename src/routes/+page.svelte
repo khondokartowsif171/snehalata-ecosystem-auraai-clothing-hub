@@ -342,7 +342,7 @@
   </section>
 
   <!-- Search Header -->
-  <div id="collection" class="sticky top-20 z-40 bg-black/80 backdrop-blur-3xl border-b border-white/5 py-6 px-6 scroll-mt-24">
+  <div id="collection" class="sticky top-20 z-40 bg-[#060507]/95 backdrop-blur-lg border-b border-white/5 py-6 px-6 scroll-mt-24">
     <div class="max-w-7xl mx-auto flex items-center gap-6">
       <button type="button" onclick={() => isSidebarOpen = !isSidebarOpen} aria-label="Open categories menu"
         class="lg:hidden p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer">
