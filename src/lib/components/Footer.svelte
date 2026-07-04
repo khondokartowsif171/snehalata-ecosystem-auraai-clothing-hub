@@ -15,16 +15,25 @@
     </div>
 
     <div>
-      <h4 class="text-white font-bold uppercase tracking-widest text-xs mb-4">Platform</h4>
+      <h4 class="text-white font-bold uppercase tracking-widest text-xs mb-4">Shop</h4>
       <ul class="space-y-2 text-sm text-gray-400">
-        <li><a href="/" class="hover:text-aura-purple transition-colors">Ecosystem Hub</a></li>
-        <li><a href="/onboarding" class="hover:text-aura-purple transition-colors">Vendor Registration</a></li>
-        <li><a href="/tracking" class="hover:text-aura-purple transition-colors">Order Tracking</a></li>
+        <li><a href="/" class="hover:text-aura-purple transition-colors">Browse Products</a></li>
+        <li><a href="/studio" class="hover:text-aura-purple transition-colors">Aura Studio · Try-On</a></li>
+        <li><a href="/tracking" class="hover:text-aura-purple transition-colors">Track My Order</a></li>
       </ul>
     </div>
 
     <div>
-      <h4 class="text-white font-bold uppercase tracking-widest text-xs mb-4">Legal & Privacy</h4>
+      <h4 class="text-white font-bold uppercase tracking-widest text-xs mb-4">For Sellers</h4>
+      <ul class="space-y-2 text-sm text-gray-400">
+        <li><a href="/sell" class="text-aura-gold/90 hover:text-aura-gold transition-colors">Sell on Snehalata</a></li>
+        <li><a href="/onboarding" class="hover:text-aura-purple transition-colors">Become a Vendor</a></li>
+        <li><a href="/dashboard" class="hover:text-aura-purple transition-colors">Vendor Login</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <h4 class="text-white font-bold uppercase tracking-widest text-xs mb-4">Legal</h4>
       <ul class="space-y-2 text-sm text-gray-400">
         <li>
           <a href="/legal" class="flex items-center gap-2 hover:text-aura-purple transition-colors">
@@ -37,14 +46,9 @@
           </a>
         </li>
       </ul>
-    </div>
-
-    <div>
-      <h4 class="text-white font-bold uppercase tracking-widest text-xs mb-4">Governance</h4>
-      <a href="/admin-login" class="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sm text-gray-300 hover:bg-aura-purple hover:text-white transition-all hover:scale-105">
-        <BarChart3 size={16} /> Admin Gateway
+      <a href="/admin-login" class="inline-flex items-center gap-2 mt-4 text-[10px] text-gray-600 hover:text-aura-purple transition-colors">
+        <BarChart3 size={12} /> Admin Gateway
       </a>
-      <p class="text-[10px] text-gray-600 mt-2">Restricted Access • Aura AI Monitored</p>
     </div>
   </div>
   
