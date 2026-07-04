@@ -235,6 +235,14 @@
     { bn: 'নকশি কাঁথা', en: 'Nakshi Kantha', story: 'Story-stitched quilts from rural artisan hands.', icon: Scissors },
     { bn: 'তাঁত ও সিল্ক', en: 'Tangail & Rajshahi Silk', story: 'Lustrous silk traditions woven across generations.', icon: Flower2 }
   ];
+
+  // Why Snehalata — the value/trust band (what makes it uniquely useful).
+  const WHY_SNEHALATA = [
+    { icon: Store, title: 'সব এক জায়গায়', sub: 'দেশের সব ব্র্যান্ড, শোরুম ও দোকান এক প্ল্যাটফর্মে।' },
+    { icon: Sparkles, title: 'AI Virtual Try-On', sub: 'কেনার আগে গায়ে পরে দেখুন — Aura Neural Engine।' },
+    { icon: ShieldCheck, title: 'Verified Sellers', sub: 'যাচাই করা বিক্রেতা ও Neural-verified পণ্য।' },
+    { icon: TrendingUp, title: 'COD + Live Tracking', sub: 'ক্যাশ অন ডেলিভারি ও রিয়েল-টাইম অর্ডার ট্র্যাকিং।' }
+  ];
 </script>
 
 <svelte:head>
@@ -338,6 +346,21 @@
           </div>
         {/each}
       </div>
+    </div>
+  </section>
+
+  <!-- Why Snehalata — value/trust band -->
+  <section class="border-b border-white/5 bg-[#060507]">
+    <div class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {#each WHY_SNEHALATA as w}
+        <div class="flex items-start gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/5">
+          <div class="p-2.5 rounded-xl bg-aura-gold/10 text-aura-gold shrink-0"><svelte:component this={w.icon} size={18} /></div>
+          <div class="min-w-0">
+            <div class="text-[13px] font-black text-white">{w.title}</div>
+            <div class="text-[10px] text-gray-500 leading-relaxed mt-0.5">{w.sub}</div>
+          </div>
+        </div>
+      {/each}
     </div>
   </section>
 
