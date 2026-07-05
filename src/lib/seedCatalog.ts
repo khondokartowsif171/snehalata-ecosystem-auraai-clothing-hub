@@ -359,7 +359,14 @@ export const mapVendorRow = (v: any): Vendor => ({
   store_name: v.store_name,
   owner_name: v.owner_name,
   status: (v.status?.toUpperCase() as Vendor['status']) || 'PENDING',
-  slug: v.slug || v.store_name?.toLowerCase().replace(/\s+/g, '-'),
+  slug:
+    v.slug ||
+    String(v.store_name || '')
+      .toLowerCase()
+      .replace(/['’`]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-+|-+$)/g, '') ||
+    'shop-' + v.id,
   description: v.description || 'Verified Artisan Hub',
   website_url: v.website_url,
   category_id: v.category_id,
