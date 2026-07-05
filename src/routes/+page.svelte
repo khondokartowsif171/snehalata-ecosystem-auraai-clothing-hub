@@ -375,6 +375,9 @@
       <p class="text-gray-400 text-sm sm:text-base max-w-2xl leading-relaxed mb-12">
         সব ব্র্যান্ড, শোরুম ও দোকানের পাশাপাশি এখানে দেশের ঐতিহ্যবাহী তাঁত ও কারুশিল্পও — যাচাই করা, Aura Neural Grid দিয়ে সাজানো। This is one of many collections on Snehalata.
       </p>
+      <a href="/heritage" class="inline-flex items-center gap-2 mb-12 -mt-6 text-[11px] font-black uppercase tracking-widest text-aura-gold hover:text-white transition-colors">
+        তাঁতি ও স্নেহলতার মানবিক অঙ্গীকার <ArrowRight size={14} />
+      </a>
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {#each HERITAGE_CRAFTS as craft}
           <div class="group relative p-6 sm:p-8 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-aura-gold/40 transition-all duration-500 overflow-hidden">

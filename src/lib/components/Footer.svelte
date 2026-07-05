@@ -19,6 +19,7 @@
       <ul class="space-y-2 text-sm text-gray-400">
         <li><a href="/" class="hover:text-aura-purple transition-colors">Browse Products</a></li>
         <li><a href="/studio" class="hover:text-aura-purple transition-colors">Aura Studio · Try-On</a></li>
+        <li><a href="/heritage" class="hover:text-aura-purple transition-colors">তাঁতি ও মানবিকতা</a></li>
         <li><a href="/tracking" class="hover:text-aura-purple transition-colors">Track My Order</a></li>
       </ul>
     </div>
