@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { fade } from 'svelte/transition';
-  import { ShoppingBag, Menu, X, Sparkles, History, PackageSearch, Store, LayoutGrid, Search, Camera, Loader2 } from '@lucide/svelte';
+  import { ShoppingBag, Menu, X, Sparkles, History, PackageSearch, Store, LayoutGrid, Search, Camera, Loader2, Mic } from '@lucide/svelte';
   import Logo from './Logo.svelte';
   import { fileToCompressedDataURL } from '$lib/imageUpload';
 
@@ -10,6 +10,19 @@
   let cartCount = $state(0);
   let q = $state('');
   let searchLoading = $state(false);
+  let listening = $state(false);
+  let voiceSupported = $state(false);
+  let focused = $state(false);
+
+  // Rotating placeholder — cycles helpful hints so the search always feels alive.
+  const PLACEHOLDERS = [
+    'Neural search · products, brands, stores…',
+    'খুঁজুন — শাড়ি, পাঞ্জাবি, কসমেটিকস…',
+    'Aura Neural Grid · সব দোকান এক জায়গায়',
+    'ভয়েস বা ছবিতেও খুঁজুন 🎙️ 📷'
+  ];
+  let phIndex = $state(0);
+  const placeholder = $derived(PLACEHOLDERS[phIndex]);
 
   function updateCart() {
     try {
@@ -44,10 +57,34 @@
     finally { searchLoading = false; input.value = ''; }
   }
 
+  // Bangla voice search — speak in বাংলা/English, Aura searches. Uses the browser's
+  // Web Speech API (free, on-device on Android Chrome). No key, no server cost.
+  let recognition: any = null;
+  function startVoice() {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    if (listening) { try { recognition?.stop(); } catch {} return; }
+    recognition = new SR();
+    recognition.lang = 'bn-BD';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (ev: any) => {
+      const text = ev.results?.[0]?.[0]?.transcript?.trim() || '';
+      if (text) { q = text; submitSearch(); }
+    };
+    recognition.onend = () => { listening = false; };
+    recognition.onerror = () => { listening = false; };
+    listening = true;
+    try { recognition.start(); } catch { listening = false; }
+  }
+
   $effect(() => {
     updateCart();
     window.addEventListener('cartUpdated', updateCart);
-    return () => window.removeEventListener('cartUpdated', updateCart);
+    // detect voice support + start the rotating placeholder (paused while focused)
+    voiceSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    const ph = setInterval(() => { if (!focused) phIndex = (phIndex + 1) % PLACEHOLDERS.length; }, 2800);
+    return () => { window.removeEventListener('cartUpdated', updateCart); clearInterval(ph); };
   });
 
 </script>
@@ -64,16 +101,23 @@
       </span>
     </a>
 
-    <!-- Neural search — permanent in the header -->
+    <!-- Neural search — permanent in the header (text · voice · photo) -->
     <div class="flex-1 max-w-xl mx-3 sm:mx-5">
       <div class="relative flex items-center gap-2">
         <div class="flex-1 relative group">
           <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 text-aura-dim group-focus-within:text-aura-green transition-colors" size={16} />
           <input type="text" bind:value={q} onkeydown={(e) => e.key === 'Enter' && submitSearch()}
-            placeholder="Neural search · products, brands, stores…"
+            onfocus={() => focused = true} onblur={() => focused = false}
+            placeholder={placeholder}
             aria-label="Neural search"
             class="w-full bg-aura-card border border-aura-green/16 rounded-xl h-10 pl-10 pr-3 text-[13px] focus:outline-none focus:border-aura-green/55 transition-all placeholder:text-aura-dim" />
         </div>
+        {#if voiceSupported}
+          <button type="button" onclick={startVoice} title="বাংলায় বলে খুঁজুন · Voice search" aria-label="Voice search"
+            class="w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center transition-all cursor-pointer {listening ? 'bg-aura-green/20 border-aura-green text-aura-green animate-pulse' : 'bg-aura-card border-aura-green/18 text-aura-green hover:border-aura-green'}">
+            <Mic size={16} />
+          </button>
+        {/if}
         <label class="w-10 h-10 shrink-0 rounded-xl bg-aura-card border border-aura-green/18 flex items-center justify-center text-aura-green hover:border-aura-green transition-all cursor-pointer" title="Search by photo" aria-label="Search by photo">
           <input type="file" accept="image/*" onchange={onCamera} class="hidden" disabled={searchLoading} />
           {#if searchLoading}<Loader2 size={15} class="animate-spin" />{:else}<Camera size={16} />{/if}
