@@ -3,6 +3,7 @@
   import Nav from '$lib/components/Nav.svelte';
   import Footer from '$lib/components/Footer.svelte';
   import BottomNav from '$lib/components/BottomNav.svelte';
+  import CategorySheet from '$lib/components/CategorySheet.svelte';
   import FloatingCart from '$lib/components/FloatingCart.svelte';
   import NeuralBackground from '$lib/components/NeuralBackground.svelte';
   import { browser } from '$app/environment';
@@ -56,6 +57,7 @@
 </div>
 
 <BottomNav />
+<CategorySheet />
 <FloatingCart />
 {#if ChatAssistant}
   <ChatAssistant />

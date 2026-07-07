@@ -6,6 +6,7 @@
   import ProductCard from '$lib/components/ProductCard.svelte';
   import { getProducts, getVendors } from '$lib/mockData';
   import { BD_LOCATIONS } from '$lib/locationData';
+  import { ECO_CATEGORIES } from '$lib/categories';
   import { track } from '$lib/analytics';
 
   let { data } = $props();
@@ -265,22 +266,7 @@
   // Neural Verified vendor rail — real vendors (top 8).
   const railVendors = $derived(vendors.slice(0, 8));
 
-  const ECO_CATEGORIES = [
-    { id: 'all', name: 'সব সংগ্রহ (All)', icon: LayoutGrid },
-    { id: 'saree', name: 'শাড়ি (Saree)', icon: Store },
-    { id: 'panjabi', name: 'পাঞ্জাবি (Panjabi)', icon: Store },
-    { id: 'three-piece', name: 'থ্রি-পিস (3-Piece)', icon: Store },
-    { id: 't-shirt', name: 'টি-শার্ট (T-Shirt)', icon: Store },
-    { id: 'pant', name: 'প্যান্ট (Pant)', icon: Store },
-    { id: 'baby', name: 'বেবি আইটেম (Baby)', icon: Store },
-    { id: 'market', name: 'মার্কেট প্লেস (Market)', icon: TrendingUp },
-    { id: 'cosmetics', name: 'কসমেটিকস (Cosmetics)', icon: Sparkles },
-    { id: 'undergarments', name: 'আন্ডারগার্মেন্টস (Undergarments)', icon: Store },
-    { id: 'gadgets', name: 'গ্যাজেট (Gadgets)', icon: Zap },
-    { id: 'others', name: 'অন্যান্য (Others)', icon: LayoutGrid }
-  ];
-
-  // Category tiles (mockup rail) — real categories with a rotating gradient palette.
+  // Category tiles — gradient fallback for categories that don't have a cover image yet.
   const TILE_BG = [
     'linear-gradient(160deg,#332720,#1B1512)',
     'linear-gradient(160deg,#332027,#1B1114)',
@@ -416,8 +402,18 @@
       {#each categoryTiles as cat, i}
         {@const Icon = cat.icon}
         <button type="button" onclick={() => selectCategory(cat.id)} class="w-24 shrink-0 text-center">
-          <div class="w-24 h-24 rounded-2xl flex items-center justify-center border border-white/5 text-aura-cream/80" style="background:{TILE_BG[i % TILE_BG.length]};">
-            <Icon size={26} strokeWidth={1.6} />
+          <div class="relative w-24 h-24 rounded-2xl overflow-hidden border border-aura-green/15">
+            {#if cat.cover}
+              <img src={cat.cover} alt={cat.name} loading="lazy" class="absolute inset-0 w-full h-full object-cover" />
+              <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent"></div>
+              <div class="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[#0a0f0d]/85 border border-aura-green/50" title="Neural Verified">
+                <ShieldCheck size={9} class="text-aura-green" /><span class="text-[7px] font-black text-aura-green tracking-tight">Verified</span>
+              </div>
+            {:else}
+              <div class="w-full h-full flex items-center justify-center text-aura-cream/80" style="background:{TILE_BG[i % TILE_BG.length]};">
+                <Icon size={26} strokeWidth={1.6} />
+              </div>
+            {/if}
           </div>
           <div class="text-[11.5px] font-semibold text-[#dde5e1] mt-2 leading-tight">{cat.name}</div>
         </button>

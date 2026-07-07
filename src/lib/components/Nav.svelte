@@ -2,12 +2,11 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { fade } from 'svelte/transition';
-  import { ShoppingBag, Menu, X, Sparkles, History, PackageSearch, Store, LayoutGrid, Search, Camera, Loader2, Mic } from '@lucide/svelte';
+  import { Menu, X, Sparkles, History, PackageSearch, Store, LayoutGrid, Search, Camera, Loader2, Mic } from '@lucide/svelte';
   import Logo from './Logo.svelte';
   import { fileToCompressedDataURL } from '$lib/imageUpload';
 
   let isMobileOpen = $state(false);
-  let cartCount = $state(0);
   let q = $state('');
   let searchLoading = $state(false);
   let listening = $state(false);
@@ -23,13 +22,6 @@
   ];
   let phIndex = $state(0);
   const placeholder = $derived(PLACEHOLDERS[phIndex]);
-
-  function updateCart() {
-    try {
-      const cart = JSON.parse(localStorage.getItem('aura_cart') || '[]');
-      cartCount = cart.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0);
-    } catch { cartCount = 0; }
-  }
 
   // Neural search lives in the global header → text goes to the home via ?q= (matches the
   // site's SearchAction schema); the home reacts to the param and runs the semantic search.
@@ -79,12 +71,10 @@
   }
 
   $effect(() => {
-    updateCart();
-    window.addEventListener('cartUpdated', updateCart);
     // detect voice support + start the rotating placeholder (paused while focused)
     voiceSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
     const ph = setInterval(() => { if (!focused) phIndex = (phIndex + 1) % PLACEHOLDERS.length; }, 2800);
-    return () => { window.removeEventListener('cartUpdated', updateCart); clearInterval(ph); };
+    return () => clearInterval(ph);
   });
 
 </script>
@@ -145,12 +135,6 @@
         <Store size={12} /> Sell on Snehalata
       </a>
 
-      <a href="/cart" class="text-gray-500 hover:text-white relative group">
-        <ShoppingBag size={20} class="group-hover:scale-110 transition-transform" />
-        {#if cartCount > 0}
-          <span class="absolute -top-2 -right-2 bg-aura-green text-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-[#0a0f0d] shadow-lg">{cartCount}</span>
-        {/if}
-      </a>
       <button type="button" aria-label="Open menu" onclick={() => isMobileOpen = !isMobileOpen} class="lg:hidden text-white cursor-pointer p-2 -m-2 touch-manipulation">
         {#if isMobileOpen}
           <X size={24} />
