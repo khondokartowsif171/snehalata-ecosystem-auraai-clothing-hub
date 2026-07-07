@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Store, Sparkles, Camera, ShieldCheck, TrendingUp, Truck, Wallet, ArrowRight, Check, Bot } from '@lucide/svelte';
+  import { Store, Sparkles, Camera, ShieldCheck, TrendingUp, Truck, Wallet, ArrowRight, Check, Bot, MessageCircle } from '@lucide/svelte';
 
   const VALUE = [
     { icon: Camera, title: 'AI Catalog — ছবি দিলেই লিস্টিং', sub: 'শুধু পণ্যের ছবি দিন — Aura AI নাম, দাম, বিবরণ ও ক্যাটাগরি বানিয়ে ক্যাটালগে তুলে দেয়। ওয়েবসাইট থাকলে সেখান থেকেও ইমপোর্ট।', en: 'Photos → AI listings' },
@@ -35,13 +35,20 @@
       বিক্রির সব কিছু এক জায়গায়। <span class="text-white font-semibold">দুইবার আপলোড করার ঝামেলা নেই।</span>
     </p>
     <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-      <a href="/onboarding" class="group flex items-center gap-3 px-8 py-4 rounded-2xl bg-aura-purple text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-[0_0_40px_rgba(124,58,237,0.35)]">
+      <a href="/onboarding" class="group flex items-center gap-3 px-8 py-4 rounded-2xl bg-aura-green text-black font-black uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-[0_0_40px_rgba(16,185,129,0.32)]">
         বিক্রেতা হিসেবে যোগ দিন <ArrowRight size={16} class="group-hover:translate-x-1 transition-transform" />
       </a>
       <a href="/dashboard" class="flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest text-xs hover:bg-white/10 transition-colors">
         <Bot size={16} class="text-aura-gold" /> Vendor Login
       </a>
     </div>
+    <p class="mt-6 text-sm text-gray-400">
+      সাহায্য লাগবে? সরাসরি কল বা WhatsApp করুন —
+      <a href="tel:01911877091" class="text-aura-green font-bold hover:text-white transition-colors">01911-877091</a>
+      <a href="https://wa.me/8801911877091" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-lg bg-aura-green/12 border border-aura-green/30 text-aura-green text-xs font-bold hover:bg-aura-green/20 transition-colors">
+        <MessageCircle size={13} /> WhatsApp
+      </a>
+    </p>
   </section>
 
   <!-- Value grid -->
@@ -71,7 +78,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       {#each STEPS as s}
         <div class="relative p-8 rounded-3xl bg-white/[0.03] border border-white/5 text-center">
-          <div class="w-14 h-14 mx-auto mb-5 rounded-2xl bg-aura-purple/15 border border-aura-purple/30 flex items-center justify-center text-2xl font-black text-aura-purple">{s.n}</div>
+          <div class="w-14 h-14 mx-auto mb-5 rounded-2xl bg-aura-green/15 border border-aura-green/30 flex items-center justify-center text-2xl font-black text-aura-green">{s.n}</div>
           <h3 class="text-lg font-bold mb-2">{s.title}</h3>
           <p class="text-sm text-gray-400 leading-relaxed">{s.sub}</p>
         </div>
@@ -102,7 +109,7 @@
     <TrendingUp size={32} class="text-aura-gold mx-auto mb-5" />
     <h2 class="text-3xl sm:text-4xl font-serif font-black italic mb-4">আজই আপনার দোকান অনলাইনে আনুন</h2>
     <p class="text-gray-400 mb-8">সারা বাংলাদেশের ক্রেতা আপনার অপেক্ষায় — Aura Neural Grid বাকিটা সামলাবে।</p>
-    <a href="/onboarding" class="inline-flex items-center gap-3 px-10 py-4 rounded-2xl bg-aura-purple text-white font-black uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-[0_0_40px_rgba(124,58,237,0.35)]">
+    <a href="/onboarding" class="inline-flex items-center gap-3 px-10 py-4 rounded-2xl bg-aura-green text-black font-black uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-[0_0_40px_rgba(16,185,129,0.32)]">
       বিক্রেতা হিসেবে যোগ দিন <ArrowRight size={16} />
     </a>
   </section>

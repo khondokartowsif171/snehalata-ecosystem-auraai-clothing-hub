@@ -1,19 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', 'Hind Siliguri', sans-serif;
+  --font-sans: 'Manrope', 'Hind Siliguri', sans-serif;
+  --font-display: 'Space Grotesk', 'Hind Siliguri', sans-serif;
   --font-serif: 'Cinzel', 'Hind Siliguri', serif;
   --font-bengali: 'Hind Siliguri', sans-serif;
 
-  /* Brand / Neural surfaces (dark, cinematic) */
+  /* Brand / Neural surfaces (dark, cinematic) — GREEN-led (trust/verified) */
+  --color-aura-green: #10b981;
+  --color-aura-green-deep: #059669;
+  --color-aura-green-bright: #00c26e;
   --color-aura-purple: #7c3aed;
   --color-aura-purple-deep: #4c2a86;
   --color-aura-purple-soft: #8b6fd6;
-  --color-aura-black: #060507;
+  --color-aura-ai: #7c6cf0; /* soft indigo — AI moments (Neural Collection) */
+  --color-aura-black: #080b09;
+  --color-aura-panel: #0a0f0d; /* app frame / deep green-black */
+  --color-aura-card: #121917;
+  --color-aura-card2: #131c18;
+  --color-aura-card3: #151e1a;
   --color-aura-ink: #1b1410;
   --color-aura-gold: #c79a3e;
   --color-aura-terra: #7d3b2e;
   --color-aura-success: #1e8a5b;
+  --color-aura-cream: #f5f3ee;
+  --color-aura-muted: #9ba8a2;
+  --color-aura-dim: #5e6d67;
   --color-aura-glass: rgba(255, 255, 255, 0.03);
   --color-aura-glassBorder: rgba(255, 255, 255, 0.08);
 
@@ -30,8 +42,8 @@
 }
 
 body {
-  background-color: #060507;
-  color: #f5efe4;
+  background-color: #080b09;
+  color: #f5f3ee;
   margin: 0;
   font-family: var(--font-sans);
   overflow-x: hidden;
@@ -41,14 +53,21 @@ body {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(circle at 50% -20%, #1a0e2b 0%, #060507 72%);
+  background: radial-gradient(circle at 30% 0%, #12191600 0%, #05070650 40%), #080b09;
 }
+
+/* Neural-grid animation keyframes (from the Aura Neural Grid design system) */
+@keyframes pulseGlow { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.75; } }
+@keyframes floatGlow { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6px, -8px); } }
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes drawerIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 .glow-orb {
   position: absolute;
   width: 50vw;
   height: 50vw;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.07) 0%, transparent 70%);
   filter: blur(80px);
   pointer-events: none;
 }
@@ -84,8 +103,16 @@ body {
 }
 
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+::-webkit-scrollbar-track { background: #05070a; }
+::-webkit-scrollbar-thumb { background: #16211c; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #10b981; }
+
+/* Faint animated neural grid — pure CSS, used behind hero/brand moments */
+.neural-grid {
+  background-image:
+    linear-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 185, 129, 0.05) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
 
 a, button { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }

@@ -2,6 +2,7 @@
   import '../app.css';
   import Nav from '$lib/components/Nav.svelte';
   import Footer from '$lib/components/Footer.svelte';
+  import BottomNav from '$lib/components/BottomNav.svelte';
   import FloatingCart from '$lib/components/FloatingCart.svelte';
   import NeuralBackground from '$lib/components/NeuralBackground.svelte';
   import { browser } from '$app/environment';
@@ -33,7 +34,7 @@
   <meta
     name="description"
     content="স্নেহলতা Aura — AI-powered ecosystem empowering local Bangladeshi artisans with global-standard technology." />
-  <meta name="theme-color" content="#7c3aed" />
+  <meta name="theme-color" content="#0a0f0d" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SNEHALATA Aura" />
   <meta property="og:image" content="https://www.snehalata.com/og-cover.svg" />
@@ -48,12 +49,13 @@
 
 <div class="min-h-screen flex flex-col">
   <Nav />
-  <main class="flex-1">
+  <main class="flex-1 pb-16 lg:pb-0">
     {@render children()}
   </main>
   <Footer />
 </div>
 
+<BottomNav />
 <FloatingCart />
 {#if ChatAssistant}
   <ChatAssistant />

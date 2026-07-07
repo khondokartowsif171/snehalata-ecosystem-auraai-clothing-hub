@@ -1,24 +1,14 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { fade, fly, scale } from 'svelte/transition';
-  import { Search, LayoutGrid, Tag, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, ShoppingBag, Menu, X, Filter, Globe, Store, Feather, Gem, Scissors, Flower2, History, Camera, Loader2, Sparkles } from '@lucide/svelte';
+  import { fade, fly } from 'svelte/transition';
+  import { Search, LayoutGrid, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, Menu, X, Filter, Globe, Store, History, Camera, Loader2, Sparkles, Play, Truck, Lock, ChevronDown } from '@lucide/svelte';
   import ProductCard from '$lib/components/ProductCard.svelte';
-  import { getProducts, getVendors, getEcosystemStats } from '$lib/mockData';
+  import { getProducts, getVendors } from '$lib/mockData';
   import { BD_LOCATIONS } from '$lib/locationData';
   import { track } from '$lib/analytics';
   import { fileToCompressedDataURL } from '$lib/imageUpload';
 
   let { data } = $props();
-
-  // Neural Grid A1 — prefer real server-computed stats; fall back to seed.
-  const stats = $derived(data?.stats ?? getEcosystemStats());
-
-  // Compact, honest number formatting — shows real small counts (e.g. "15", "247"), not "0K+".
-  function fmt(n: number): string {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M+';
-    if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K+';
-    return String(n ?? 0);
-  }
 
   // Debounced search-intent capture for the Grid.
   let searchTimer: ReturnType<typeof setTimeout>;
@@ -34,6 +24,7 @@
   let selectedDistrict = $state('all');
   let searchQuery = $state('');
   let isSidebarOpen = $state(false);
+  let bannerExpanded = $state(false);
 
   // Neural Grid A3 — semantic + visual "search by photo".
   let semanticActive = $state(false);
@@ -93,8 +84,7 @@
   }
 
   // Pick a category: clear any active photo/semantic search and scroll the results
-  // into view so mobile users immediately see the filtered grid (it sits below the
-  // hero + heritage strip, so without this a tap looks like "nothing happened").
+  // into view so users immediately see the filtered grid.
   function selectCategory(id: string) {
     selectedCategory = id;
     semanticActive = false;
@@ -104,18 +94,18 @@
       setTimeout(() => document.getElementById('collection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
     }
   }
+
   // Seeded from the server load so the grid renders during SSR / first paint.
   let products = $state<any[]>(data?.products ?? []);
   let vendors = $state<any[]>(data?.vendors ?? []);
 
   // Neural Grid A7 — real trending products (server, ranked by trend_score).
   const trending = $derived<any[]>(data?.trending ?? []);
-  // Neural Grid A2 — "For You": products this visitor recently opened (client, localStorage).
-  // Recently-viewed IDs live in localStorage; the product objects are DERIVED from
-  // `products`. Critical: we must NEVER write `products`-dependent state inside the
-  // sync effect below — reading `products` while also assigning it made the effect
-  // depend on its own output → effect_update_depth_exceeded, which tore down the
-  // page's reactivity (chat/add/category stopped responding until a refresh).
+
+  // Neural Grid A2 — "For You": recently-opened products. Recently-viewed IDs live in
+  // localStorage; the product objects are DERIVED from `products`. Critical: never write
+  // `products`-dependent state inside the sync effect below (that self-dependency caused
+  // effect_update_depth_exceeded → chat/add/category dead until refresh).
   let recentIds = $state<number[]>([]);
 
   function loadRecentIds() {
@@ -143,7 +133,6 @@
     };
     refresh();
     loadRecentIds();
-    // syncWithNeuralGrid() dispatches these once Supabase data arrives client-side.
     window.addEventListener('productUpdated', refresh);
     window.addEventListener('vendorUpdated', refresh);
     window.addEventListener('recentlyViewedUpdated', loadRecentIds);
@@ -153,6 +142,27 @@
       window.removeEventListener('recentlyViewedUpdated', loadRecentIds);
     };
   });
+
+  // Hero carousel — 3 rotating slides. The interval callback runs OUTSIDE effect
+  // tracking, so reading heroIndex there is NOT a reactive dependency → no loop.
+  const HERO_SLIDES = [
+    { pill: 'AI-Powered · Neural Verified', t1: 'The Future of', t2: 'Shopping is Here', en: "Bangladesh's first AI marketplace — try before you buy, powered by Aura Neural Grid.", bn: 'বিশ্বাসের সাথে কেনাকাটা।' },
+    { pill: 'AR Try-On · Powered by AI', t1: 'See It On You', t2: 'Before You Buy', en: 'Virtual try-on lets you preview fashion & beauty instantly — before you spend a taka.', bn: 'আসল পণ্য, সঠিক দামে।' },
+    { pill: 'Trust-First Marketplace', t1: 'Every Vendor,', t2: 'Neural Verified', en: 'From small local shops to big brands — every seller is authenticated for your safety.', bn: 'সবার বাজেটে, সবার জন্য।' }
+  ];
+  let heroIndex = $state(0);
+  const hero = $derived(HERO_SLIDES[heroIndex]);
+  $effect(() => {
+    const id = setInterval(() => { heroIndex = (heroIndex + 1) % HERO_SLIDES.length; }, 6000);
+    return () => clearInterval(id);
+  });
+
+  const TRUST_PILLS = [
+    { icon: Sparkles, en: 'AI-Powered Smart Shopping', bn: 'এআই-চালিত স্মার্ট শপিং' },
+    { icon: ShieldCheck, en: 'Neural Verified Vendors', bn: 'যাচাইকৃত বিক্রেতা' },
+    { icon: Lock, en: 'Secure & Safe Transactions', bn: 'নিরাপদ লেনদেন' },
+    { icon: Truck, en: 'Fast Delivery Across BD', bn: 'দ্রুত ডেলিভারি' }
+  ];
 
   const SITE_URL = 'https://www.snehalata.com';
   let jsonLd = $derived(
@@ -193,12 +203,7 @@
               image: p.imageUrl,
               description: p.description,
               category: p.category,
-              offers: {
-                '@type': 'Offer',
-                price: p.price,
-                priceCurrency: 'BDT',
-                availability: 'https://schema.org/InStock'
-              }
+              offers: { '@type': 'Offer', price: p.price, priceCurrency: 'BDT', availability: 'https://schema.org/InStock' }
             }
           }))
         }
@@ -214,7 +219,6 @@
     return matchesCat && matchesSearch && matchesDistrict;
   }));
 
-  // When a neural (semantic/visual) search is active, show those ranked results instead.
   let displayProducts = $derived(semanticActive ? semanticResults : filteredProducts);
 
   let categoryVendors = $derived(vendors.filter(v => {
@@ -224,44 +228,33 @@
     return products.some(p => p.vendorId === v.id && p.category.toLowerCase().includes(selectedCategory.toLowerCase()));
   }));
 
+  // Neural Verified vendor rail — real vendors (top 8).
+  const railVendors = $derived(vendors.slice(0, 8));
+
   const ECO_CATEGORIES = [
     { id: 'all', name: 'সব সংগ্রহ (All)', icon: LayoutGrid },
-    { id: 'saree', name: 'শাড়ি (Saree)', icon: Tag },
-    { id: 'panjabi', name: 'পাঞ্জাবি (Panjabi)', icon: Tag },
-    { id: 'three-piece', name: 'থ্রি-পিস (3-Piece)', icon: Tag },
-    { id: 't-shirt', name: 'টি-শার্ট (T-Shirt)', icon: Tag },
-    { id: 'pant', name: 'প্যান্ট (Pant)', icon: Tag },
-    { id: 'baby', name: 'বেবি আইটেম (Baby)', icon: Tag },
+    { id: 'saree', name: 'শাড়ি (Saree)', icon: Store },
+    { id: 'panjabi', name: 'পাঞ্জাবি (Panjabi)', icon: Store },
+    { id: 'three-piece', name: 'থ্রি-পিস (3-Piece)', icon: Store },
+    { id: 't-shirt', name: 'টি-শার্ট (T-Shirt)', icon: Store },
+    { id: 'pant', name: 'প্যান্ট (Pant)', icon: Store },
+    { id: 'baby', name: 'বেবি আইটেম (Baby)', icon: Store },
     { id: 'market', name: 'মার্কেট প্লেস (Market)', icon: TrendingUp },
-    { id: 'cosmetics', name: 'কসমেটিকস (Cosmetics)', icon: Tag },
-    { id: 'undergarments', name: 'আন্ডারগার্মেন্টস (Undergarments)', icon: Tag },
-    { id: 'gadgets', name: 'গ্যাজেট (Gadgets)', icon: Tag },
-    { id: 'others', name: 'অন্যান্য (Others)', icon: Tag }
+    { id: 'cosmetics', name: 'কসমেটিকস (Cosmetics)', icon: Sparkles },
+    { id: 'undergarments', name: 'আন্ডারগার্মেন্টস (Undergarments)', icon: Store },
+    { id: 'gadgets', name: 'গ্যাজেট (Gadgets)', icon: Zap },
+    { id: 'others', name: 'অন্যান্য (Others)', icon: LayoutGrid }
   ];
 
-  // Heritage craft pillars — the premium-heritage story (bn + en), gold-accented.
-  const HERITAGE_CRAFTS = [
-    { bn: 'জামদানি', en: 'Jamdani', story: 'UNESCO-listed Dhakai muslin motifs, handwoven thread by thread.', icon: Feather },
-    { bn: 'মসলিন', en: 'Muslin', story: 'The legendary feather-light weave of Bengal, reborn for today.', icon: Gem },
-    { bn: 'নকশি কাঁথা', en: 'Nakshi Kantha', story: 'Story-stitched quilts from rural artisan hands.', icon: Scissors },
-    { bn: 'তাঁত ও সিল্ক', en: 'Tangail & Rajshahi Silk', story: 'Lustrous silk traditions woven across generations.', icon: Flower2 }
+  // Category tiles (mockup rail) — real categories with a rotating gradient palette.
+  const TILE_BG = [
+    'linear-gradient(160deg,#332720,#1B1512)',
+    'linear-gradient(160deg,#332027,#1B1114)',
+    'linear-gradient(160deg,#152228,#0C1416)',
+    'linear-gradient(160deg,#1B2A1E,#101A12)',
+    'linear-gradient(160deg,#2B2617,#19160D)'
   ];
-
-  // The 4 superpowers — the unfamiliar magic, explained as a guide ("BD-তে এই প্রথম").
-  const SUPERPOWERS = [
-    { emoji: '📸', title: 'Neural Search', bn: 'ছবি দিয়ে খুঁজুন', sub: 'পছন্দের রঙ বা কাপড়ের একটা ছবি দিন — Aura সেকেন্ডে সেই ধরনের পণ্য খুঁজে এনে দেবে।', how: 'সার্চ বারে ক্যামেরা আইকনে চাপুন' },
-    { emoji: '👗', title: 'AR Try-On', bn: 'গায়ে পরে দেখুন', sub: 'নিজের ছবি দিন — পোশাকটা আপনার গায়ে কেমন লাগবে, কেনার আগেই দেখে নিন।', how: 'যেকোনো পণ্যে "TRY-ON" বাটন' },
-    { emoji: '✨', title: 'Aura Event Styling', bn: 'ইভেন্টের পুরো সাজ', sub: 'বিয়ে, হলুদ, ঈদ বা বেড়ানো — ইভেন্টের নাম বলুন, Aura পুরো সাজ সাজেস্ট করবে।', how: 'Aura চ্যাটে ইভেন্টের নাম লিখুন' },
-    { emoji: '💬', title: 'Aura Chat', bn: 'বাংলায় কেনাকাটা', sub: 'বাংলায় কথা বলে পণ্য খুঁজুন, অর্ডার করুন, COD দিন — Aura সব সামলাবে।', how: 'নিচের ডান কোণে চ্যাট বাটন' }
-  ];
-
-  // Why Snehalata — bold trust claims (name carries the softness; copy carries the ambition).
-  const WHY_SNEHALATA = [
-    { icon: ShieldCheck, title: 'AI-Verified', sub: 'যাচাই করা বিক্রেতা — নকল ধরা পড়বেই।' },
-    { icon: Store, title: 'সব ব্র্যান্ড এক জায়গায়', sub: 'ছোট দোকান থেকে বড় ব্র্যান্ড, সবার সাধ্যে।' },
-    { icon: Sparkles, title: 'নিজের storefront', sub: 'প্রতিটি দোকানের নিজস্ব brand.snehalata.com।' },
-    { icon: TrendingUp, title: 'COD + Live Tracking', sub: 'ক্যাশ অন ডেলিভারি ও রিয়েল-টাইম ট্র্যাকিং।' }
-  ];
+  const categoryTiles = ECO_CATEGORIES.filter(c => c.id !== 'all');
 </script>
 
 <svelte:head>
@@ -270,7 +263,7 @@
     name="description"
     content="স্নেহলতা Aura — বাংলাদেশের সব ব্র্যান্ড, শোরুম ও দোকান এক AI প্ল্যাটফর্মে। জামদানি থেকে আধুনিক ফ্যাশন, গ্যাজেট থেকে প্রতিদিনের প্রয়োজন — virtual try-on, semantic search আর Neural Grid দিয়ে সহজ কেনাকাটা।" />
   <link rel="canonical" href="https://www.snehalata.com/" />
-  <meta name="theme-color" content="#7c3aed" />
+  <meta name="theme-color" content="#0a0f0d" />
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SNEHALATA Aura" />
@@ -293,165 +286,196 @@
   {@html `<script type="application/ld+json">${jsonLd}<\/script>`}
 </svelte:head>
 
-<div class="min-h-screen bg-[#060507] text-white selection:bg-[#7c3aed]/30 font-sans">
-  <!-- Hero — bold, first-AI-marketplace voice; the 3-verb hook -->
-  <section class="relative overflow-hidden border-b border-white/5">
-    <div class="absolute inset-0 bg-gradient-to-b from-[#7c3aed]/20 via-transparent to-transparent pointer-events-none"></div>
-    <div class="max-w-7xl mx-auto px-6 py-16 sm:py-24 lg:py-28 relative">
-      <div class="inline-flex items-center gap-2 px-4 py-2 mb-6 bg-[#7c3aed]/15 border border-[#7c3aed]/30 rounded-full">
-        <span class="w-2 h-2 rounded-full bg-[#7c3aed] animate-pulse"></span>
-        <span class="text-[10px] font-black uppercase tracking-[0.26em] text-[#c4b5fd]">Bangladesh's First AI-Controlled Marketplace</span>
+<div class="min-h-screen bg-[#080b09] text-aura-cream selection:bg-aura-green/30 font-sans">
+
+  <!-- HERO — rotating carousel, neural-grid backdrop -->
+  <section class="relative overflow-hidden border-b border-aura-green/10">
+    <div class="absolute inset-0 neural-grid pointer-events-none opacity-60"></div>
+    <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.22),transparent_70%)] blur-lg pointer-events-none" style="animation:pulseGlow 6s ease-in-out infinite;"></div>
+    <div class="absolute top-40 -left-24 w-64 h-64 rounded-full bg-[radial-gradient(circle,rgba(199,154,62,0.14),transparent_70%)] blur pointer-events-none" style="animation:pulseGlow 7s ease-in-out infinite 1.2s;"></div>
+
+    <div class="max-w-7xl mx-auto px-5 sm:px-6 py-12 sm:py-20 relative grid lg:grid-cols-2 gap-12 items-center">
+      <!-- text -->
+      <div>
+        {#key heroIndex}
+          <div style="animation:fadeSlide .4s ease;">
+            <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-aura-gold/40 bg-aura-gold/[0.08] font-display text-[10.5px] font-semibold tracking-wide text-aura-gold">{hero.pill}</span>
+            <h1 class="font-display font-bold text-4xl sm:text-5xl lg:text-6xl leading-[1.1] text-aura-cream mt-5">
+              {hero.t1}<br /><span class="text-aura-green">{hero.t2}</span>
+            </h1>
+            <p class="text-[15px] sm:text-base leading-relaxed text-aura-muted mt-4 max-w-xl">{hero.en}</p>
+            <p class="font-bengali text-sm text-[#6e8a80] mt-1.5">{hero.bn}</p>
+          </div>
+        {/key}
+
+        <div class="flex flex-wrap items-center gap-5 mt-7">
+          <a href="#collection" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-br from-aura-green-deep to-aura-green-bright text-black font-bold text-sm shadow-[0_10px_24px_rgba(16,185,129,0.3)] hover:brightness-110 transition-all">
+            Shop Smarter Today <ArrowRight size={15} strokeWidth={2.4} />
+          </a>
+          <a href="/heritage" class="inline-flex items-center gap-2 text-[#3fce96] font-bold text-[13px] hover:text-aura-green transition-colors">
+            <Play size={16} class="fill-current" /> How Snehalata Works
+          </a>
+        </div>
+
+        <!-- dots -->
+        <div class="flex items-center gap-2 mt-8">
+          {#each HERO_SLIDES as _, i}
+            <button aria-label={`Slide ${i + 1}`} onclick={() => heroIndex = i}
+              class="h-1.5 rounded-full transition-all duration-200 {i === heroIndex ? 'w-5 bg-aura-green' : 'w-1.5 bg-white/20'}"></button>
+          {/each}
+        </div>
       </div>
-      <!-- English-first: the novel tech = instant "new + trusted" signal; Bengali carries the benefit -->
-      <p class="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-none">
-        <span class="text-aura-gold">AR Try-On</span> <span class="text-gray-600">·</span> <span class="text-[#c4b5fd]">Aura Neural Grid</span>
-      </p>
-      <p class="mt-3 mb-8 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.3em] text-gray-500">First in Bangladesh's e-commerce · সম্পূর্ণ AI-নিয়ন্ত্রিত</p>
-      <h1 class="text-3xl md:text-5xl lg:text-6xl font-serif font-black italic leading-[1.05] max-w-4xl">
-        ছবি দিন। <span class="text-aura-gold">গায়ে পরে দেখুন।</span><br class="hidden sm:block" /> তারপর কিনুন।
-      </h1>
-      <p class="mt-6 text-gray-300 text-base md:text-lg max-w-2xl leading-relaxed">
-        কেনার আগে <span class="text-white font-semibold">দেখা যায়</span> — দেশে এই প্রথম। রঙ বা কাপড়ের ছবি দিন, Aura সেকেন্ডে খুঁজে দেবে; গায়ে পরে দেখুন, তারপর নিশ্চিন্তে কিনুন।
-      </p>
-      <div class="mt-10 flex flex-wrap items-center gap-4">
-        <a href="#collection"
-          class="px-8 py-4 bg-aura-gold text-black hover:bg-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all inline-flex items-center gap-3 cursor-pointer">
-          কেনাকাটা শুরু করুন <ArrowRight size={16} />
-        </a>
-        <a href="/sell"
-          class="px-8 py-4 bg-white/5 border border-white/10 hover:border-aura-gold rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all">
-          Sell on Snehalata
-        </a>
+
+      <!-- neural orb visual -->
+      <div class="relative h-56 sm:h-72 rounded-3xl overflow-hidden bg-[radial-gradient(circle_at_60%_35%,#16221D,#0B1210)] border border-aura-green/15 hidden sm:block">
+        <div class="absolute inset-0 neural-grid opacity-70"></div>
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full border border-aura-green/35" style="animation:floatGlow 5s ease-in-out infinite;"></div>
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 rounded-full border border-aura-gold/30"></div>
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.28),transparent_75%)] flex items-center justify-center text-aura-green">
+          {#if heroIndex === 0}<Sparkles size={34} />{:else if heroIndex === 1}<Camera size={32} />{:else}<ShieldCheck size={32} />{/if}
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Superpowers — the unfamiliar magic, GUIDED (BD-তে এই প্রথম) -->
-  <section class="border-b border-white/5 bg-gradient-to-b from-[#0c0a14] to-[#060507]">
-    <div class="max-w-7xl mx-auto px-6 py-16 sm:py-20">
-      <div class="flex items-center gap-4 mb-3">
-        <span class="h-px w-10 bg-[#7c3aed]/70"></span>
-        <span class="text-[10px] font-black uppercase tracking-[0.4em] text-[#c4b5fd]">যা বাংলাদেশে আর কোথাও নেই</span>
-      </div>
-      <h2 class="text-3xl sm:text-4xl font-serif font-black italic mb-3 max-w-3xl leading-tight">
-        Aura Intelligence — আপনার <span class="text-aura-gold">নিজের স্টাইলিস্ট</span>
-      </h2>
-      <p class="text-gray-400 text-sm sm:text-base max-w-2xl mb-12">
-        এটি একটি <span class="text-white font-semibold">AI-নিয়ন্ত্রিত মার্কেটপ্লেস</span> — সাধারণ e-commerce যা পারে না, Aura তা পারে।
-      </p>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {#each SUPERPOWERS as sp}
-          <div class="p-6 rounded-3xl bg-white/[0.03] border border-white/8 hover:border-[#7c3aed]/40 transition-colors">
-            <div class="flex items-start gap-4">
-              <div class="text-3xl leading-none shrink-0">{sp.emoji}</div>
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 flex-wrap mb-1.5">
-                  <h3 class="text-lg font-black tracking-tight">{sp.title}</h3>
-                  <span class="text-[13px] font-semibold text-gray-400">{sp.bn}</span>
-                  <span class="text-[8px] font-black uppercase tracking-[0.18em] text-[#c4b5fd] bg-[#7c3aed]/15 border border-[#7c3aed]/30 px-2 py-0.5 rounded-full">দেশে এই প্রথম</span>
-                </div>
-                <p class="text-sm text-gray-400 leading-relaxed">{sp.sub}</p>
-                <p class="text-[11px] text-aura-gold/90 mt-2.5 font-bold flex items-center gap-1.5">
-                  <ArrowRight size={12} /> {sp.how}
-                </p>
-              </div>
-            </div>
-          </div>
-        {/each}
-      </div>
-    </div>
-  </section>
-
-  <!-- Heritage Story Strip -->
-  <section class="border-b border-white/5 bg-gradient-to-b from-[#0b0a0d] to-[#060507]">
-    <div class="max-w-7xl mx-auto px-6 py-16 sm:py-20">
-      <div class="flex items-center gap-4 mb-4">
-        <span class="h-px w-10 bg-aura-gold/60"></span>
-        <span class="text-[10px] font-black uppercase tracking-[0.4em] text-aura-gold">Featured Collection · Heritage of Bengal</span>
-      </div>
-      <h2 class="text-3xl sm:text-4xl font-serif font-black italic mb-4 max-w-3xl leading-tight">
-        শতাব্দীর <span class="text-aura-gold">তাঁত ও কারুশিল্প</span>, বিশ্বমানে
-      </h2>
-      <p class="text-gray-400 text-sm sm:text-base max-w-2xl leading-relaxed mb-12">
-        সব ব্র্যান্ড, শোরুম ও দোকানের পাশাপাশি এখানে দেশের ঐতিহ্যবাহী তাঁত ও কারুশিল্পও — যাচাই করা, Aura Neural Grid দিয়ে সাজানো। This is one of many collections on Snehalata.
-      </p>
-      <a href="/heritage" class="inline-flex items-center gap-2 mb-12 -mt-6 text-[11px] font-black uppercase tracking-widest text-aura-gold hover:text-white transition-colors">
-        তাঁতি ও স্নেহলতার মানবিক অঙ্গীকার <ArrowRight size={14} />
-      </a>
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {#each HERITAGE_CRAFTS as craft}
-          <div class="group relative p-6 sm:p-8 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-aura-gold/40 transition-all duration-500 overflow-hidden">
-            <div class="absolute -right-8 -bottom-8 text-aura-gold/[0.06] group-hover:text-aura-gold/10 transition-colors pointer-events-none">
-              <svelte:component this={craft.icon} size={120} />
-            </div>
-            <div class="relative z-10">
-              <div class="w-12 h-12 rounded-2xl bg-aura-gold/10 border border-aura-gold/20 flex items-center justify-center text-aura-gold mb-5">
-                <svelte:component this={craft.icon} size={20} />
-              </div>
-              <h3 class="text-lg font-serif font-black italic text-white mb-0.5">{craft.bn}</h3>
-              <p class="text-[10px] font-black uppercase tracking-widest text-aura-gold/80 mb-3">{craft.en}</p>
-              <p class="text-xs text-gray-500 leading-relaxed">{craft.story}</p>
-            </div>
-          </div>
-        {/each}
-      </div>
-    </div>
-  </section>
-
-  <!-- Why Snehalata — value/trust band -->
-  <section class="border-b border-white/5 bg-[#060507]">
-    <div class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-      {#each WHY_SNEHALATA as w}
-        <div class="flex items-start gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/5">
-          <div class="p-2.5 rounded-xl bg-aura-gold/10 text-aura-gold shrink-0"><svelte:component this={w.icon} size={18} /></div>
-          <div class="min-w-0">
-            <div class="text-[13px] font-black text-white">{w.title}</div>
-            <div class="text-[10px] text-gray-500 leading-relaxed mt-0.5">{w.sub}</div>
-          </div>
+  <!-- TRUST PILLS -->
+  <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-8">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {#each TRUST_PILLS as t}
+        {@const Icon = t.icon}
+        <div class="bg-aura-card border border-aura-green/14 rounded-2xl p-4 flex flex-col items-center text-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-aura-green/10 flex items-center justify-center text-aura-green shrink-0"><Icon size={18} /></div>
+          <span class="text-[11px] font-bold text-aura-cream leading-tight">{t.en}</span>
+          <span class="font-bengali text-[9px] text-aura-dim">{t.bn}</span>
         </div>
       {/each}
     </div>
   </section>
 
-  <!-- Search Header -->
-  <div id="collection" class="sticky top-20 z-40 bg-[#060507]/95 backdrop-blur-lg border-b border-white/5 py-6 px-6 scroll-mt-24">
-    <div class="max-w-7xl mx-auto flex items-center gap-6">
+  <!-- NEURAL VERIFIED banner -->
+  <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-5">
+    <button type="button" onclick={() => bannerExpanded = !bannerExpanded}
+      class="w-full text-left rounded-2xl border border-aura-green/30 bg-[linear-gradient(120deg,rgba(16,185,129,0.14),rgba(199,154,62,0.05))] p-4 sm:p-5">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-aura-green/16 flex items-center justify-center text-aura-green shrink-0"><ShieldCheck size={19} /></div>
+        <div class="flex-1 min-w-0">
+          <div class="font-display text-[11px] font-bold tracking-[1.4px] text-aura-gold">NEURAL VERIFIED</div>
+          <div class="text-sm font-semibold text-aura-cream mt-0.5">Trusted &amp; Authentic Marketplace</div>
+        </div>
+        <ChevronDown size={16} class="text-aura-muted transition-transform {bannerExpanded ? 'rotate-180' : ''}" />
+      </div>
+      {#if bannerExpanded}
+        <p transition:fade={{ duration: 150 }} class="mt-3 pt-3 border-t border-aura-green/15 text-[13px] leading-relaxed text-[#93a29b]">
+          প্রতিটি বিক্রেতা Snehalata-তে যুক্ত হওয়ার আগে পরিচয়, পণ্যের সত্যতা ও ডেলিভারি যাচাই পার হয় — ছোট দোকান থেকে বড় ব্র্যান্ড, সবাই।
+        </p>
+      {/if}
+    </button>
+  </section>
+
+  <!-- CATEGORIES rail -->
+  <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-8">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="font-display text-lg font-bold text-aura-cream">Shop by Categories</h2>
+      <a href="#collection" class="text-[12.5px] font-bold text-aura-green">View All</a>
+    </div>
+    <div class="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+      {#each categoryTiles as cat, i}
+        {@const Icon = cat.icon}
+        <button type="button" onclick={() => selectCategory(cat.id)} class="w-24 shrink-0 text-center">
+          <div class="w-24 h-24 rounded-2xl flex items-center justify-center border border-white/5 text-aura-cream/80" style="background:{TILE_BG[i % TILE_BG.length]};">
+            <Icon size={26} strokeWidth={1.6} />
+          </div>
+          <div class="text-[11.5px] font-semibold text-[#dde5e1] mt-2 leading-tight">{cat.name}</div>
+        </button>
+      {/each}
+    </div>
+  </section>
+
+  <!-- NEURAL VERIFIED VENDORS rail -->
+  {#if railVendors.length > 0}
+    <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-8">
+      <div class="flex items-baseline justify-between mb-3">
+        <h2 class="font-display text-lg font-bold text-aura-cream">Neural Verified Vendors</h2>
+        <a href="#collection" class="text-[12.5px] font-bold text-aura-green">View All</a>
+      </div>
+      <div class="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+        {#each railVendors as v}
+          <a href={`/store/${v.slug}`} class="w-40 shrink-0">
+            <div class="relative w-40 h-[104px] rounded-2xl bg-[linear-gradient(160deg,#1A2C24,#0D1712)] border border-white/5 flex items-center justify-center overflow-hidden">
+              <Store size={30} class="text-white/20" />
+              <div class="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#0a0f0d]/80 border border-aura-green/40">
+                <ShieldCheck size={9} class="text-aura-green" />
+                <span class="text-[8px] font-bold text-aura-green">Neural Verified</span>
+              </div>
+            </div>
+            <div class="text-[13px] font-bold text-aura-cream mt-2 truncate">{v.store_name}</div>
+            <div class="flex items-center gap-1.5 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-aura-green"></span>
+              <span class="text-[10.5px] text-[#93a29b] truncate">{v.description || 'Verified Storefront'}</span>
+            </div>
+          </a>
+        {/each}
+      </div>
+    </section>
+  {/if}
+
+  <!-- PROMO cards -->
+  <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <a href="#collection" class="relative overflow-hidden rounded-3xl p-5 h-40 flex flex-col bg-[linear-gradient(145deg,#1A1934,#0D0D1C)] border border-aura-ai/35">
+        <Sparkles size={56} class="absolute top-2 right-2 text-aura-ai/30" />
+        <span class="font-display text-[9.5px] font-bold tracking-[1.4px] text-[#9c90f5]">AI CURATED</span>
+        <span class="text-[15px] font-bold text-aura-cream mt-1.5">Neural Collection</span>
+        <span class="text-[11.5px] text-[#8e96ae] mt-1">Curated for You by AI</span>
+        <span class="mt-auto self-start px-3.5 py-2 rounded-lg border border-aura-ai text-[#9c90f5] text-[11.5px] font-bold">Explore Now</span>
+      </a>
+      <a href="#collection" class="relative overflow-hidden rounded-3xl p-5 h-40 flex flex-col bg-[linear-gradient(145deg,#123024,#0A1A12)] border border-aura-gold/40">
+        <Zap size={56} class="absolute top-2 right-2 text-aura-gold/30" />
+        <span class="font-display text-[9.5px] font-bold tracking-[1.4px] text-aura-gold">LIMITED TIME</span>
+        <span class="text-[15px] font-bold text-aura-cream mt-1.5">Mega Deals</span>
+        <span class="text-[13px] font-bold text-aura-gold mt-1">Up to 70% OFF</span>
+        <span class="mt-auto self-start px-3.5 py-2 rounded-lg bg-gradient-to-br from-aura-green-deep to-aura-green-bright text-black text-[11.5px] font-bold">Shop Now</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- SEARCH HEADER (sticky) — real neural + visual search -->
+  <div id="collection" class="sticky top-20 z-40 bg-[#080b09]/95 backdrop-blur-lg border-y border-aura-green/10 py-5 px-5 sm:px-6 scroll-mt-24 mt-10">
+    <div class="max-w-7xl mx-auto flex items-center gap-4">
       <button type="button" onclick={() => isSidebarOpen = !isSidebarOpen} aria-label="Open categories menu"
         class="lg:hidden p-3 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer">
         <Menu size={20} />
       </button>
       <div class="flex-1 relative group">
-        <Search class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#7c3aed] transition-colors" size={20} />
+        <Search class="absolute left-5 top-1/2 -translate-y-1/2 text-aura-dim group-focus-within:text-aura-green transition-colors" size={19} />
         <input type="text" bind:value={searchQuery} oninput={onSearchInput}
           onkeydown={(e) => e.key === 'Enter' && runSemanticSearch()}
-          placeholder="Neural search — describe what you want, or tap the camera"
-          class="w-full bg-white/5 border border-white/10 rounded-[2rem] py-4 pl-16 pr-28 text-sm focus:outline-none focus:border-[#7c3aed]/50 focus:ring-8 focus:ring-[#7c3aed]/5 transition-all placeholder:text-gray-600" />
-        <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-          <label class="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-aura-gold text-gray-400 hover:text-aura-gold transition-all cursor-pointer" title="Search by photo">
+          placeholder="Search products, brands or stores…"
+          class="w-full bg-aura-card border border-aura-green/16 rounded-2xl py-3.5 pl-14 pr-24 text-sm focus:outline-none focus:border-aura-green/55 transition-all placeholder:text-aura-dim" />
+        <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+          <label class="p-2.5 rounded-xl bg-white/5 border border-aura-green/18 hover:border-aura-green text-aura-green transition-all cursor-pointer" title="Search by photo">
             <input type="file" accept="image/*" onchange={runVisualSearch} class="hidden" disabled={searchLoading} />
             {#if searchLoading}<Loader2 size={16} class="animate-spin" />{:else}<Camera size={16} />{/if}
           </label>
-          <button onclick={runSemanticSearch} aria-label="Neural search" class="p-2.5 rounded-xl bg-[#7c3aed] text-white hover:bg-white hover:text-black transition-all cursor-pointer">
+          <button onclick={runSemanticSearch} aria-label="Neural search" class="p-2.5 rounded-xl bg-gradient-to-br from-aura-green-deep to-aura-green-bright text-black hover:brightness-110 transition-all cursor-pointer">
             <Sparkles size={16} />
           </button>
         </div>
       </div>
-      <div class="hidden md:flex items-center gap-4">
-        <div class="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
-          <ShieldCheck size={14} class="text-green-500" />
-          <span class="text-[10px] font-black uppercase tracking-widest text-green-500">Neural Verified</span>
-        </div>
+      <div class="hidden md:flex items-center gap-2 px-4 py-2 bg-aura-green/10 border border-aura-green/20 rounded-full shrink-0">
+        <ShieldCheck size={14} class="text-aura-green" />
+        <span class="text-[10px] font-black uppercase tracking-widest text-aura-green">Neural Verified</span>
       </div>
     </div>
   </div>
 
-  <!-- Mobile category rail — always visible so categories never "disappear" behind a drawer -->
-  <div class="lg:hidden border-b border-white/5 bg-[#060507]/70 backdrop-blur-xl">
+  <!-- Mobile category rail -->
+  <div class="lg:hidden border-b border-white/5 bg-[#080b09]/70 backdrop-blur-xl">
     <div class="max-w-7xl mx-auto px-4 py-3">
       <div class="flex gap-2 overflow-x-auto no-scrollbar">
         {#each ECO_CATEGORIES as cat}
           <button type="button" onclick={() => selectCategory(cat.id)}
-            class="flex-shrink-0 px-4 py-2 rounded-xl text-[11px] font-bold border transition-all touch-manipulation {selectedCategory === cat.id ? 'bg-aura-purple border-aura-purple text-white' : 'bg-white/5 border-white/10 text-gray-400'}">
+            class="flex-shrink-0 px-4 py-2 rounded-xl text-[11px] font-bold border transition-all touch-manipulation {selectedCategory === cat.id ? 'bg-aura-green border-aura-green text-black' : 'bg-white/5 border-white/10 text-gray-400'}">
             {cat.name}
           </button>
         {/each}
@@ -460,16 +484,17 @@
   </div>
 
   <div class="max-w-7xl mx-auto flex relative">
-    <!-- Sidebar -->
+    <!-- Sidebar (desktop) -->
     <aside class="hidden lg:block w-80 h-[calc(100vh-100px)] sticky top-[100px] overflow-y-auto p-8 border-r border-white/5 no-scrollbar">
       <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-8 px-4">Neural Grid Categories</h3>
       <nav class="space-y-2">
         {#each ECO_CATEGORIES as cat}
+          {@const Icon = cat.icon}
           <button onclick={() => selectCategory(cat.id)}
-            class="w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all group cursor-pointer {selectedCategory === cat.id ? 'bg-[#7c3aed] text-white shadow-xl shadow-[#7c3aed]/20 translate-x-2' : 'text-gray-400 hover:bg-white/5 hover:text-white'}">
+            class="w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all group cursor-pointer {selectedCategory === cat.id ? 'bg-aura-green text-black shadow-xl shadow-aura-green/20 translate-x-2' : 'text-gray-400 hover:bg-white/5 hover:text-white'}">
             <div class="flex items-center gap-4">
-              <span class={selectedCategory === cat.id ? 'text-white' : 'text-gray-600 group-hover:text-[#7c3aed] transition-colors'}>
-                <svelte:component this={cat.icon} size={16} />
+              <span class={selectedCategory === cat.id ? 'text-black' : 'text-gray-600 group-hover:text-aura-green transition-colors'}>
+                <Icon size={16} />
               </span>
               <span class="text-[13px] font-bold tracking-wide">{cat.name}</span>
             </div>
@@ -478,24 +503,24 @@
         {/each}
       </nav>
 
-      <div class="mt-12 p-8 bg-gradient-to-br from-[#7c3aed]/20 to-indigo-500/20 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
+      <div class="mt-12 p-8 bg-gradient-to-br from-aura-green/15 to-aura-ai/15 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
         <div class="relative z-10 text-center">
-          <h4 class="text-lg font-serif font-black italic mb-3">SNEHALATA Sell</h4>
+          <h4 class="font-display text-lg font-bold mb-3">Sell on Snehalata</h4>
           <p class="text-[10px] text-gray-400 leading-relaxed mb-6 font-medium">Launch your AI-powered brand storefront today.</p>
-          <a href="/onboarding" class="block w-full py-3 bg-white text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform text-center">Join Network</a>
+          <a href="/sell" class="block w-full py-3 bg-white text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform text-center">Join Network</a>
         </div>
         <Zap class="absolute -right-6 -bottom-6 text-white/5 group-hover:text-white/10 transition-colors" size={120} />
       </div>
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 p-6 lg:p-12">
-      <!-- Neural Grid A3 — semantic/visual search results banner -->
+    <main class="flex-1 p-5 sm:p-6 lg:p-12">
+      <!-- semantic/visual search results banner -->
       {#if semanticActive}
         <section class="mb-10">
-          <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-[#7c3aed]/15 to-aura-gold/10 border border-white/10">
+          <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-aura-green/15 to-aura-gold/10 border border-white/10">
             <div class="flex items-center gap-3">
-              <div class="p-2.5 rounded-xl bg-[#7c3aed]/20 text-[#7c3aed]"><Sparkles size={16} /></div>
+              <div class="p-2.5 rounded-xl bg-aura-green/20 text-aura-green"><Sparkles size={16} /></div>
               <div>
                 <p class="text-sm font-black">Neural results · {semanticResults.length} matches</p>
                 {#if semanticCaption}<p class="text-[10px] text-gray-400 mt-0.5 italic">From your photo: “{semanticCaption}”</p>{/if}
@@ -508,14 +533,14 @@
         </section>
       {/if}
 
-      <!-- Neural Grid A7 — real trending rail -->
+      <!-- trending rail -->
       {#if !semanticActive && selectedCategory === 'all' && searchQuery === '' && trending.length > 0}
         <section class="mb-16">
           <div class="flex items-center gap-4 mb-8">
             <div class="p-3 bg-aura-gold/10 rounded-2xl text-aura-gold"><TrendingUp size={16} /></div>
             <div>
-              <h3 class="text-2xl sm:text-3xl font-serif font-black italic">Trending on the Grid</h3>
-              <p class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">Ranked live by real views, carts & orders</p>
+              <h3 class="text-2xl sm:text-3xl font-display font-bold">Trending on the Grid</h3>
+              <p class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">Ranked live by real views, carts &amp; orders</p>
             </div>
           </div>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-10">
@@ -526,13 +551,13 @@
         </section>
       {/if}
 
-      <!-- Neural Grid A2 — behavioral "For You" rail -->
+      <!-- behavioral "For You" rail -->
       {#if !semanticActive && selectedCategory === 'all' && searchQuery === '' && recentlyViewed.length > 0}
         <section class="mb-16">
           <div class="flex items-center gap-4 mb-8">
-            <div class="p-3 bg-aura-purple/10 rounded-2xl text-aura-purple"><History size={16} /></div>
+            <div class="p-3 bg-aura-green/10 rounded-2xl text-aura-green"><History size={16} /></div>
             <div>
-              <h3 class="text-2xl sm:text-3xl font-serif font-black italic">For You · Recently Viewed</h3>
+              <h3 class="text-2xl sm:text-3xl font-display font-bold">For You · Recently Viewed</h3>
               <p class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">Picked from what you explored</p>
             </div>
           </div>
@@ -546,11 +571,11 @@
 
       <div class="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-8">
         <div class="flex items-center gap-4">
-          <h2 class="text-4xl font-serif font-black italic leading-none">
+          <h2 class="text-3xl sm:text-4xl font-display font-bold leading-none">
             {selectedCategory === 'all' ? 'Neural Collection' : ECO_CATEGORIES.find(c => c.id === selectedCategory)?.name}
           </h2>
           <span class="h-px w-12 bg-white/10 hidden sm:block"></span>
-          <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">{displayProducts.length} Neural Items</span>
+          <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">{displayProducts.length} Items</span>
         </div>
         <div class="flex items-center gap-3">
           <div class="hidden sm:flex -space-x-4">
@@ -572,30 +597,30 @@
         </div>
       </div>
 
-      <!-- Featured Vendors -->
+      <!-- Featured Vendors (category-scoped) -->
       {#if selectedCategory !== 'all' && categoryVendors.length > 0}
         <section class="mb-16">
           <div class="flex items-center justify-between mb-8 px-2">
             <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">
-              Verified Artisan Nodes in {ECO_CATEGORIES.find(c => c.id === selectedCategory)?.name}
+              Verified Vendors in {ECO_CATEGORIES.find(c => c.id === selectedCategory)?.name}
             </h3>
             <div class="h-px flex-1 mx-8 bg-white/5 hidden sm:block" />
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {#each categoryVendors as v}
-              <a href={`/store/${v.slug}`} class="group relative bg-[#0A0A0A] border border-white/5 p-5 rounded-3xl hover:border-[#7c3aed] transition-all cursor-pointer flex items-center gap-6 overflow-hidden">
+              <a href={`/store/${v.slug}`} class="group relative bg-aura-card border border-white/5 p-5 rounded-3xl hover:border-aura-green transition-all cursor-pointer flex items-center gap-6 overflow-hidden">
                 <div class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                   <Globe size={80} />
                 </div>
                 <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-                  <Store size={24} class="text-[#7c3aed]" />
+                  <Store size={24} class="text-aura-green" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <h4 class="text-xl font-serif font-black italic mb-1 truncate group-hover:text-[#7c3aed] transition-colors">{v.store_name}</h4>
-                  <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest truncate">{v.description || 'Verified Artisan Hub'}</p>
+                  <h4 class="text-xl font-display font-bold mb-1 truncate group-hover:text-aura-green transition-colors">{v.store_name}</h4>
+                  <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest truncate">{v.description || 'Verified Vendor Hub'}</p>
                   <div class="flex items-center gap-2 mt-2">
-                    <div class="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    <span class="text-[8px] font-black uppercase tracking-widest text-green-500/80">Neural Node Active</span>
+                    <div class="w-1.5 h-1.5 rounded-full bg-aura-green" />
+                    <span class="text-[8px] font-black uppercase tracking-widest text-aura-green/80">Neural Node Active</span>
                   </div>
                 </div>
                 <div class="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0 -translate-x-4">
@@ -631,7 +656,7 @@
             <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-white/10">
               <Search size={32} class="text-gray-800" />
             </div>
-            <h3 class="text-2xl font-serif font-bold mb-2">No Neural Signal</h3>
+            <h3 class="text-2xl font-display font-bold mb-2">No Neural Signal</h3>
             <p class="text-gray-500 text-sm max-w-xs mx-auto">Try another category or refine your search.</p>
           </div>
         {/if}
@@ -639,34 +664,31 @@
       {/if}
 
       {#if !semanticActive && filteredProducts.length > 0}
-        <div class="mt-32 text-center border-t border-white/5 pt-20">
-          <button class="group px-12 py-5 bg-[#0A0A0A] border border-white/10 rounded-[2rem] hover:border-[#7c3aed] transition-all duration-700 relative overflow-hidden inline-flex items-center gap-4 cursor-pointer">
-            <span class="relative z-10 text-[11px] font-black uppercase tracking-[0.4em] text-white">Explore Full Collection</span>
-            <ArrowRight size={16} class="group-hover:translate-x-2 transition-transform text-[#7c3aed]" />
-          </button>
-          <p class="mt-12 text-[10px] text-gray-700 font-black uppercase tracking-[0.5em] leading-relaxed">
-            No. 1 Retail AI Ecosystem • Snehalata Aura • World Class Infrastructure
+        <div class="mt-28 text-center border-t border-white/5 pt-16">
+          <p class="text-[10px] text-gray-700 font-black uppercase tracking-[0.5em] leading-relaxed">
+            Bangladesh's AI Marketplace • Snehalata Aura • Neural Verified
           </p>
         </div>
       {/if}
     </main>
   </div>
 
-  <!-- Mobile Sidebar -->
+  <!-- Mobile Sidebar drawer -->
   {#if isSidebarOpen}
     <div class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 lg:hidden" transition:fade onclick={() => isSidebarOpen = false} />
-    <div class="fixed top-0 left-0 bottom-0 w-80 bg-black z-[60] p-10 lg:hidden border-r border-white/10" transition:fly={{ x: -300, duration: 300 }}>
+    <div class="fixed top-0 left-0 bottom-0 w-80 bg-[#0a0f0d] z-[60] p-10 lg:hidden border-r border-white/10" transition:fly={{ x: -300, duration: 300 }}>
       <div class="flex items-center justify-between mb-12">
-        <h2 class="text-2xl font-serif font-black italic">Categories</h2>
+        <h2 class="text-2xl font-display font-bold">Categories</h2>
         <button onclick={() => isSidebarOpen = false} class="p-3 hover:bg-white/5 rounded-2xl transition-colors cursor-pointer">
           <X size={24} />
         </button>
       </div>
       <div class="space-y-4">
         {#each ECO_CATEGORIES as cat}
+          {@const Icon = cat.icon}
           <button type="button" onclick={() => selectCategory(cat.id)}
-            class="w-full flex items-center gap-6 p-5 rounded-3xl border transition-all cursor-pointer {selectedCategory === cat.id ? 'bg-[#7c3aed] border-[#7c3aed] text-white shadow-2xl' : 'bg-white/5 border-white/10 text-gray-400'}">
-            <svelte:component this={cat.icon} size={16} />
+            class="w-full flex items-center gap-6 p-5 rounded-3xl border transition-all cursor-pointer {selectedCategory === cat.id ? 'bg-aura-green border-aura-green text-black shadow-2xl' : 'bg-white/5 border-white/10 text-gray-400'}">
+            <Icon size={16} />
             <span class="font-bold tracking-wide">{cat.name}</span>
           </button>
         {/each}
