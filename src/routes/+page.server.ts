@@ -43,5 +43,16 @@ export const load: PageServerLoad = async ({ setHeaders }) => {
     }
   }
 
-  return { products, vendors, stats: stats ?? SEED_STATS, trending: trending ?? [] };
+  // Lighter first paint: put the featured brand first, cap the SSR grid, and truncate
+  // long Bengali descriptions (kept full for SEO/JSON-LD via the first cards). The client
+  // (`getProducts()` on mount) refills the FULL catalog + full descriptions right after
+  // hydration, so nothing is lost — this only shrinks the initial HTML/hydration payload.
+  const totalProducts = products.length;
+  const featuredIds = new Set(vendors.filter((v) => v.slug === 'panjabi-kuthir').map((v) => v.id));
+  const ssrProducts = [...products]
+    .sort((a, b) => (featuredIds.has(b.vendorId) ? 1 : 0) - (featuredIds.has(a.vendorId) ? 1 : 0))
+    .slice(0, 40)
+    .map((p) => ({ ...p, description: (p.description || '').slice(0, 140) }));
+
+  return { products: ssrProducts, vendors, stats: stats ?? SEED_STATS, trending: trending ?? [], totalProducts };
 };

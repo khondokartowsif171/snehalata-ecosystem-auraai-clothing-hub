@@ -229,7 +229,7 @@
         {
           '@type': 'ItemList',
           name: 'Neural Collection',
-          numberOfItems: products.length,
+          numberOfItems: data?.totalProducts ?? products.length,
           itemListElement: products.slice(0, 24).map((p, i) => ({
             '@type': 'ListItem',
             position: i + 1,
