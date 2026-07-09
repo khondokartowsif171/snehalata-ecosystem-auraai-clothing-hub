@@ -17,28 +17,228 @@ export function isApproved(status: unknown): boolean {
   return String(status ?? '').toUpperCase() === 'APPROVED';
 }
 
-/** Scrape a vendor's website and AI-extract its products. */
-async function scrapeProducts(url: string) {
-  const target = /^https?:\/\//i.test(url) ? url : `https://${url}`;
-  const resp = await axios.get(target, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-    },
-    timeout: 12000
+// ─────────────────────────────────────────────────────────────────────────────
+// Robust "give us your link" catalog importer. Tries the reliable, FREE, structured
+// paths first (Shopify feed → JSON-LD → sitemap sweep) and only falls back to the AI
+// text extractor when a site has no machine-readable product data. This is what lets
+// a website-owning brand onboard with ZERO re-typing — and the daily cron keeps it fresh.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ImportedProduct = {
+  name: string;
+  price: number;
+  imageUrl: string;
+  description: string;
+  category?: string;
+  confidence?: number;
+};
+
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+function normalizeUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+async function httpGet(target: string, timeout = 12000): Promise<any | null> {
+  try {
+    const r = await axios.get(target, {
+      headers: { 'User-Agent': UA, Accept: 'text/html,application/json,application/xml;q=0.9,*/*;q=0.8' },
+      timeout,
+      maxContentLength: 8_000_000,
+      // Some feeds/sites 403 without a referer; keep it forgiving.
+      validateStatus: (s) => s >= 200 && s < 400
+    });
+    return r.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function toAbsolute(src: string, origin: string): string {
+  if (!src) return '';
+  try {
+    return new URL(src, origin).href;
+  } catch {
+    return src;
+  }
+}
+
+function parsePrice(v: any): number {
+  if (v == null) return 0;
+  if (typeof v === 'number') return v;
+  const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
+function pickImage(img: any, origin: string): string {
+  if (!img) return '';
+  if (typeof img === 'string') return toAbsolute(img, origin);
+  if (Array.isArray(img)) return pickImage(img[0], origin);
+  if (typeof img === 'object') return toAbsolute(img.url || img.src || img.contentUrl || '', origin);
+  return '';
+}
+
+// ── 1. Shopify: /products.json returns the WHOLE catalog, cleanly, in a few calls ──
+async function fromShopify(origin: string): Promise<ImportedProduct[]> {
+  const out: ImportedProduct[] = [];
+  for (let page = 1; page <= 4; page++) {
+    const data = await httpGet(`${origin}/products.json?limit=250&page=${page}`, 10000);
+    const list = data && Array.isArray(data.products) ? data.products : null;
+    if (!list || !list.length) break;
+    for (const p of list) {
+      const variant = Array.isArray(p.variants) ? p.variants[0] : null;
+      out.push({
+        name: String(p.title || '').trim(),
+        price: parsePrice(variant?.price),
+        imageUrl: pickImage(p.images, origin),
+        description: cheerio.load(String(p.body_html || '')).text().trim().slice(0, 500),
+        category: String(p.product_type || '').trim() || undefined,
+        confidence: 100
+      });
+    }
+    if (list.length < 250) break;
+  }
+  return out.filter((p) => p.name);
+}
+
+// ── 2. JSON-LD Product schema (Shopify, Woo, Wix, most SEO'd customs emit this) ──
+// Deep-walks the whole graph so it catches BOTH plain `Product` nodes AND the nested
+// `Store → OfferCatalog → Offer → itemOffered:Product` shape (price sits on the Offer).
+function jsonLdProducts(html: string, origin: string): ImportedProduct[] {
+  const out: ImportedProduct[] = [];
+  const $ = cheerio.load(html);
+  $('script[type="application/ld+json"]').each((_, el) => {
+    let json: any;
+    try {
+      json = JSON.parse($(el).contents().text());
+    } catch {
+      return;
+    }
+    const visit = (n: any) => {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) return n.forEach(visit);
+      const types = ([] as string[]).concat(n['@type'] || []).map(String);
+      if (types.includes('Offer') && n.itemOffered && typeof n.itemOffered === 'object') {
+        const p = n.itemOffered;
+        out.push({
+          name: String(p.name || '').trim(),
+          price: parsePrice(n.price ?? n.lowPrice ?? p.price),
+          imageUrl: pickImage(p.image || n.image, origin),
+          description: String(p.description || '').trim().slice(0, 500),
+          category: String(p.category || '').trim() || undefined,
+          confidence: 90
+        });
+      } else if (types.includes('Product')) {
+        const offers = Array.isArray(n.offers) ? n.offers[0] : n.offers;
+        out.push({
+          name: String(n.name || '').trim(),
+          price: parsePrice(offers?.price ?? offers?.lowPrice ?? n.price),
+          imageUrl: pickImage(n.image, origin),
+          description: String(n.description || '').trim().slice(0, 500),
+          category: String(n.category || '').trim() || undefined,
+          confidence: 90
+        });
+      }
+      for (const k of Object.keys(n)) visit(n[k]); // recurse into every value
+    };
+    visit(json);
   });
-  const $ = cheerio.load(resp.data);
+  return out.filter((p) => p.name);
+}
+
+// ── 3. Sitemap sweep — for non-Shopify sites, collect product URLs and JSON-LD each ──
+async function fromSitemap(origin: string, cap = 40): Promise<ImportedProduct[]> {
+  const seen = new Set<string>();
+  const productUrls: string[] = [];
+  const sitemaps = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`, `${origin}/product-sitemap.xml`];
+  const queue = [...sitemaps];
+  let fetched = 0;
+  while (queue.length && productUrls.length < cap && fetched < 8) {
+    const sm = queue.shift()!;
+    const xml = await httpGet(sm, 8000);
+    if (!xml || typeof xml !== 'string') continue;
+    fetched++;
+    const locs = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1]);
+    for (const loc of locs) {
+      if (/\.xml($|\?)/i.test(loc)) {
+        if (/product/i.test(loc)) queue.unshift(loc);
+        continue;
+      }
+      if (/\/(product|products|shop|item|p)\//i.test(loc) && !seen.has(loc)) {
+        seen.add(loc);
+        productUrls.push(loc);
+      }
+    }
+  }
+  const out: ImportedProduct[] = [];
+  // Small concurrency so we stay within the serverless budget.
+  const batch = 6;
+  for (let i = 0; i < productUrls.length && i < cap; i += batch) {
+    const slice = productUrls.slice(i, i + batch);
+    const pages = await Promise.all(slice.map((u) => httpGet(u, 8000)));
+    for (const html of pages) {
+      if (typeof html === 'string') out.push(...jsonLdProducts(html, origin));
+    }
+  }
+  return out;
+}
+
+// ── 4. AI fallback — unstructured site: let Gemini read the visible text ──
+async function geminiFallback(html: string): Promise<ImportedProduct[]> {
+  const $ = cheerio.load(html);
   $('script, style, noscript, iframe, svg').remove();
   const body = ($('body').html() || '').substring(0, 18000);
-
-  // Gemini preview models can be slow or 503 under load. Bound each attempt so a
-  // hung call can't blow the 60s function budget; degrade to [] (next sync/cron
-  // retries) rather than crashing.
   for (let i = 0; i < 2; i++) {
     const result = await withTimeout(gemini.analyzeWebsiteProducts(body), 22000);
-    if (result) return result.products || [];
+    if (result) return (result.products || []) as ImportedProduct[];
     await new Promise((r) => setTimeout(r, 1500));
+  }
+  return [];
+}
+
+function dedupeByName(items: ImportedProduct[]): ImportedProduct[] {
+  const map = new Map<string, ImportedProduct>();
+  const score = (x: ImportedProduct) => (x.price > 0 ? 2 : 0) + (x.imageUrl ? 1 : 0);
+  for (const it of items) {
+    const k = it.name.toLowerCase().trim();
+    if (!k) continue;
+    const prev = map.get(k);
+    if (!prev || score(it) > score(prev)) map.set(k, it); // keep the richest version
+  }
+  return [...map.values()];
+}
+
+
+/** Import a vendor's whole catalog from their website — structured first, AI last. */
+export async function scrapeProducts(url: string): Promise<ImportedProduct[]> {
+  const target = normalizeUrl(url);
+  let origin = target;
+  try {
+    origin = new URL(target).origin;
+  } catch {
+    /* keep as-is */
+  }
+
+  // 1. Shopify feed — the cleanest, whole-catalog path.
+  const shopify = await fromShopify(origin);
+  if (shopify.length) return dedupeByName(shopify);
+
+  const html = await httpGet(target, 12000);
+  if (typeof html === 'string') {
+    // 2. JSON-LD on the landing page.
+    const onPage = jsonLdProducts(html, origin);
+    // 3. Sitemap sweep to get the FULL catalog (not just what's on the homepage).
+    const swept = await fromSitemap(origin);
+    const structured = dedupeByName([...onPage, ...swept]);
+    if (structured.length >= 3) return structured;
+    if (structured.length) {
+      // A couple structured hits — try AI too and merge for better coverage.
+      const ai = await geminiFallback(html);
+      return dedupeByName([...structured, ...ai]);
+    }
+    // 4. No structured data at all → AI reads the page.
+    return dedupeByName(await geminiFallback(html));
   }
   return [];
 }
@@ -59,12 +259,12 @@ export async function syncVendor(
   const have = new Set((existing || []).map((p: any) => String(p.name || '').toLowerCase().trim()));
 
   const rows = items
-    .filter((it: any) => it?.name && (it.confidence === undefined || Number(it.confidence) >= 40))
-    .filter((it: any) => !have.has(String(it.name).toLowerCase().trim()))
-    .map((it: any) => ({
+    .filter((it) => it?.name && (it.confidence === undefined || Number(it.confidence) >= 40))
+    .filter((it) => !have.has(String(it.name).toLowerCase().trim()))
+    .map((it) => ({
       name: String(it.name).slice(0, 200),
       price: Number(it.price) || 0,
-      category: 'Imported',
+      category: (it.category || 'Imported').slice(0, 60),
       description: (it.description || `Imported from ${vendor.store_name}`).slice(0, 500),
       image_url: it.imageUrl || '',
       stock_quantity: 10,
