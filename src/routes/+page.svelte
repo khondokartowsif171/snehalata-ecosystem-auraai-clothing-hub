@@ -507,14 +507,16 @@
     </div>
   </section>
 
-  <!-- "NEURAL VERIFIED" band — shield-badge backdrop spanning the core-feature strip + সাধ্য Mode -->
-  <div class="relative overflow-hidden mt-6">
-    <img src="/aura-hero-bg.jpg" alt="" aria-hidden="true" class="absolute inset-0 h-full w-full object-cover object-center opacity-[0.10] pointer-events-none" />
-    <div class="absolute inset-0 bg-gradient-to-b from-[#080b09] via-[#080b09]/85 to-[#080b09] pointer-events-none"></div>
-    <div class="relative z-10">
+  <!-- NEURAL VERIFIED emblem — Snehalata's trust symbol, shown clearly right under the map -->
+  <section class="max-w-2xl mx-auto px-5 sm:px-6 mt-7">
+    <div class="relative rounded-[2rem] overflow-hidden border border-aura-green/30 shadow-[0_0_55px_rgba(16,185,129,0.20)]">
+      <img src="/aura-hero-bg.jpg" alt="SNEHALATA — Neural Verified" loading="lazy" class="w-full h-auto block" />
+      <div class="pointer-events-none absolute inset-0 ring-1 ring-inset ring-aura-gold/15 rounded-[2rem]"></div>
+    </div>
+  </section>
 
   <!-- AURA FEATURE STRIP — the "AI Powered Smart Shopping" poster, recreated as tappable chips -->
-  <section class="max-w-7xl mx-auto px-3 sm:px-6">
+  <section class="max-w-7xl mx-auto px-3 sm:px-6 mt-6">
     <div class="text-center mb-4">
       <p class="font-display text-[10px] sm:text-[11px] font-black uppercase tracking-[0.35em] text-aura-green/90">AI Powered Smart Shopping</p>
     </div>
@@ -608,10 +610,6 @@
       {/if}
     </div>
   </section>
-
-    </div>
-  </div>
-  <!-- /NEURAL VERIFIED band -->
 
   <!-- CATEGORIES rail -->
   <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-8">
