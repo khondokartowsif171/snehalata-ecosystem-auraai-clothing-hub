@@ -61,6 +61,12 @@ export const PATCH: RequestHandler = async ({ request, url }) => {
   for (const f of ['store_name', 'owner_name', 'website_url', 'district', 'area', 'description', 'category']) {
     if (body[f] !== undefined) update[f] = body[f] === '' ? null : body[f];
   }
+  // Per-vendor fixed commission % (used in the global "Fixed" commission mode).
+  if (body.commission_rate !== undefined) {
+    const n = Number(body.commission_rate);
+    if (!Number.isFinite(n) || n < 0 || n > 50) throw error(400, 'commission_rate must be 0–50');
+    update.commission_rate = n;
+  }
   if (Object.keys(update).length === 0) throw error(400, 'no fields to update');
 
   const { data, error: e } = await adminClient().from('vendors').update(update).eq('id', id).select().single();

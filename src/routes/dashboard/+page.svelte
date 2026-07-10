@@ -117,6 +117,19 @@
   let pwLoading = $state(false);
   let isSyncing = $state(false);
   let isDeepImporting = $state(false);
+  // Commission the vendor pays — reflects the global mode (Fixed % or Aura Smart 6–11%).
+  let commissionLabel = $state('');
+  $effect(() => {
+    if (!vendor) return;
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((cfg) => {
+        const c = cfg?.commission;
+        if (c?.mode === 'aura') commissionLabel = `Aura Smart · ${c.min ?? 6}%–${c.max ?? 11}%`;
+        else commissionLabel = `${(vendor as any).commission_rate ?? c?.base ?? 10}%`;
+      })
+      .catch(() => {});
+  });
 
   // Heavy headless render — for app-style (SPA) sites the fast Sync can't read.
   async function handleDeepImport() {
@@ -550,6 +563,12 @@
             <button onclick={() => { showPwModal = true; pwMsg = null; }} class="text-aura-green hover:underline cursor-pointer">Change Password</button>
             <button onclick={handleLogout} class="text-red-500 hover:underline cursor-pointer">Switch Account</button>
           </p>
+          {#if commissionLabel}
+            <div class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-aura-green/10 border border-aura-green/25">
+              <span class="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">আপনার কমিশন · Commission</span>
+              <span class="text-sm font-black text-aura-green">{commissionLabel}</span>
+            </div>
+          {/if}
           <p class="text-[11px] text-gray-400 mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
             <span class="text-gray-600 uppercase tracking-[0.2em] text-[9px] font-black">সাহায্য / Support</span>
             <a href="tel:01911877091" class="text-aura-gold font-bold hover:text-white transition-colors">📞 01911-877091</a>

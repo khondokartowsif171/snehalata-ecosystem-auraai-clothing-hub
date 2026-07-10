@@ -245,7 +245,7 @@
           <Eye size={14} />
         </a>
       </div>
-      <a href={`/try-on/${product.id}`}
+      <a href={String((product as any).category || '').toLowerCase() === 'cosmetics' ? '/studio?tool=makeup' : `/try-on/${product.id}`}
         class="flex items-center gap-1.5 px-3 py-1 bg-white/[0.03] hover:bg-[#10b981]/20 border border-white/5 rounded-lg text-gray-500 hover:text-[#10b981] transition-all group/try">
         <Shirt size={10} /> <span class="text-[7px] font-black uppercase tracking-widest">Try-on</span>
       </a>

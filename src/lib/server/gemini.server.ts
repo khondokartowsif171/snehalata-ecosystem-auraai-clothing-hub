@@ -9,6 +9,25 @@ const ai = new GoogleGenAI({
   }
 });
 
+// Optional second-lane key (same billing) for image generation FAILOVER: when the primary
+// key hits a 429/quota, retry the same call on this one. No-op if GEMINI_API_KEY_2 is unset.
+// (Same project ⇒ shared quota, so this is mainly a reliability net, not a throughput boost.)
+const _key2 = process.env.GEMINI_API_KEY_2 || '';
+const ai2 = _key2
+  ? new GoogleGenAI({ apiKey: _key2, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } })
+  : null;
+
+async function imageGen(params: any) {
+  try {
+    return await ai.models.generateContent(params);
+  } catch (e: any) {
+    const m = String(e?.message || '').toLowerCase();
+    const quota = /resource_exhausted|429|quota|rate limit|limit:\s*0/.test(m);
+    if (quota && ai2) return await ai2.models.generateContent(params); // failover lane
+    throw e;
+  }
+}
+
 // Gemini preview models 503 ("high demand / UNAVAILABLE") under load. Retry those
 // transient failures with a short backoff before giving up. Non-transient errors
 // (bad request, auth) throw immediately.
@@ -200,7 +219,7 @@ export const generateTryOnTransformation = async (userImg: string, productImg: s
     let lastErr: any = null;
     for (const model of models) {
         try {
-            const response = await withRetry(() => ai.models.generateContent({
+            const response = await withRetry(() => imageGen({
                 model,
                 contents: { parts },
                 config: { responseModalities: [Modality.IMAGE] }
@@ -234,7 +253,7 @@ export const generateMakeupTryOn = async (selfie: string, shade: string, kind: s
     let lastErr: any = null;
     for (const model of models) {
         try {
-            const response = await withRetry(() => ai.models.generateContent({
+            const response = await withRetry(() => imageGen({
                 model, contents: { parts }, config: { responseModalities: [Modality.IMAGE] }
             }));
             for (const part of response.candidates?.[0]?.content?.parts || []) {

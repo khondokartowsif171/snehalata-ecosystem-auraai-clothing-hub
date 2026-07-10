@@ -14,6 +14,7 @@
   type HomeCat = { id: string; name: string; cover: string; active: boolean; order: number };
   let homeCats = $state<HomeCat[]>([]);
   let featuredSlugs = $state<string>('panjabi-kuthir');
+  let commissionCfg = $state<{ mode: 'fixed' | 'aura'; base: number; min: number; max: number }>({ mode: 'fixed', base: 10, min: 6, max: 11 });
   let configLoaded = $state(false);
   let isSavingConfig = $state(false);
   let configMsg = $state('');
@@ -32,6 +33,7 @@
         ? cfg.categories.map((c: any, i: number) => ({ id: c.id, name: c.name, cover: c.cover || '', active: c.active !== false, order: c.order ?? i }))
         : seedHomeCatsFromDefaults();
       featuredSlugs = (cfg?.featured?.vendorSlugs ?? ['panjabi-kuthir']).join(', ');
+      if (cfg?.commission) commissionCfg = { mode: cfg.commission.mode === 'aura' ? 'aura' : 'fixed', base: Number(cfg.commission.base) || 10, min: Number(cfg.commission.min) || 6, max: Number(cfg.commission.max) || 11 };
     } catch {
       homeCats = seedHomeCatsFromDefaults();
     }
@@ -89,7 +91,7 @@
       const r = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass() },
-        body: JSON.stringify({ categories, featured })
+        body: JSON.stringify({ categories, featured, commission: commissionCfg })
       });
       const d = await r.json();
       configMsg = d.ok ? 'Saved ✓ — live on the home page' : 'Save failed: ' + (d.message || 'error');
@@ -251,7 +253,8 @@
       owner_name: (v as any).owner_name || '',
       website_url: (v as any).website_url || '',
       district: (v as any).district || '',
-      category: (v as any).category || ''
+      category: (v as any).category || '',
+      commission_rate: (v as any).commission_rate ?? 10
     };
   }
   async function saveEditVendor() {
@@ -1125,6 +1128,30 @@
                 </div>
               {/if}
 
+              <!-- Commission control -->
+              <div class="mt-6 pt-5 border-t border-white/10 space-y-4">
+                <h4 class="text-[11px] font-black uppercase tracking-widest text-aura-gold">কমিশন · Commission</h4>
+                <div class="flex gap-2">
+                  <button onclick={() => commissionCfg.mode = 'fixed'}
+                    class="flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all {commissionCfg.mode === 'fixed' ? 'bg-aura-green border-aura-green text-white' : 'bg-white/5 border-white/10 text-gray-400'}">Fixed %</button>
+                  <button onclick={() => commissionCfg.mode = 'aura'}
+                    class="flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all {commissionCfg.mode === 'aura' ? 'bg-aura-green border-aura-green text-white' : 'bg-white/5 border-white/10 text-gray-400'}">Aura Smart</button>
+                </div>
+                {#if commissionCfg.mode === 'fixed'}
+                  <div class="flex items-center gap-3">
+                    <label class="text-[11px] text-gray-400 font-bold">Base rate (all vendors, unless a vendor has its own):</label>
+                    <input type="number" min="0" max="50" bind:value={commissionCfg.base} class="w-20 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-aura-green" /> <span class="text-gray-500">%</span>
+                  </div>
+                {:else}
+                  <p class="text-[11px] text-gray-400 leading-relaxed">Aura ঠিক করবে প্রতি বিক্রির কমিশন — বড় অর্ডার ও ভালো-রেটেড ভেন্ডরে কম। <span class="text-aura-gold font-bold">{commissionCfg.min}%–{commissionCfg.max}%</span>-এর মধ্যে বাঁধা। (এই মোডে per-vendor fixed rate গুলো paused থাকে।)</p>
+                  <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2"><label class="text-[11px] text-gray-400 font-bold">Floor</label><input type="number" min="0" max="50" bind:value={commissionCfg.min} class="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-aura-green" /><span class="text-gray-500">%</span></div>
+                    <div class="flex items-center gap-2"><label class="text-[11px] text-gray-400 font-bold">Base</label><input type="number" min="0" max="50" bind:value={commissionCfg.base} class="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-aura-green" /><span class="text-gray-500">%</span></div>
+                    <div class="flex items-center gap-2"><label class="text-[11px] text-gray-400 font-bold">Ceiling</label><input type="number" min="0" max="50" bind:value={commissionCfg.max} class="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-aura-green" /><span class="text-gray-500">%</span></div>
+                  </div>
+                {/if}
+              </div>
+
               <div class="flex items-center gap-4 mt-6 pt-5 border-t border-white/10">
                 <button onclick={saveHomeConfig} disabled={isSavingConfig}
                   class="px-8 py-3.5 bg-aura-green text-white rounded-xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:scale-[1.03] transition-all disabled:opacity-50">
@@ -1207,6 +1234,10 @@
                   <option value={c.id} class="bg-black">{c.name}</option>
                 {/each}
               </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] text-gray-500 font-black uppercase tracking-widest px-1">Commission % (Fixed mode)</label>
+              <input type="number" min="0" max="50" bind:value={editVendor.commission_rate} class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-aura-green" />
             </div>
           </div>
           <div class="flex gap-3 mt-7">
@@ -1298,7 +1329,7 @@
                 <div class="space-y-2">
                   <label class="text-[8px] text-gray-500 font-black uppercase tracking-widest px-1">Artifact Media [Neural Inject]</label>
                   <div class="grid grid-cols-1 gap-3">
-                    <div class="w-full aspect-video bg-white/5 border-2 border-dashed rounded-xl flex flex-col items-center justify-center overflow-hidden transition-all relative group/upload {!!newProduct.imageUrl ? 'border-aura-green/50' : 'border-white/10'}"
+                    <div class="w-full max-w-sm mx-auto h-52 bg-white/5 border-2 border-dashed rounded-xl flex flex-col items-center justify-center overflow-hidden transition-all relative group/upload {!!newProduct.imageUrl ? 'border-aura-green/50' : 'border-white/10'}"
                     >
                       {#if newProduct.imageUrl}
                         <img src={newProduct.imageUrl} alt="Artifact Preview" class="w-full h-full object-cover" />

@@ -59,6 +59,9 @@
 
   $effect(() => {
     if (!browser) return;
+    // Deep-link: a Cosmetics product's "Try-on" opens the Makeup tab (/studio?tool=makeup).
+    const t = new URLSearchParams(window.location.search).get('tool');
+    if (t === 'makeup') activeTool = 'MAKEUP';
     // Refresh garments from the LIVE catalog (not just the seed) — the layout's
     // syncWithNeuralGrid fills it after mount + fires productUpdated. Without this the
     // picker showed only the handful of seed sarees.

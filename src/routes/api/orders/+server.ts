@@ -1,9 +1,9 @@
 import { json, error } from '@sveltejs/kit';
 import { adminClient } from '$lib/server/vendorSync';
 import { encodeTracking } from '$lib/trackingCode';
+import { readSiteConfig, normalizeCommission, computeAuraCommission } from '$lib/server/siteConfig.server';
 import type { RequestHandler } from './$types';
 
-const DEFAULT_COMMISSION = 10; // snehalata platform commission (%) if a vendor has none set
 const money = (n: number) => Math.round(n * 100) / 100;
 
 // Public checkout: creates one order + per-vendor line items with commission/payout.
@@ -26,20 +26,53 @@ export const POST: RequestHandler = async ({ request }) => {
   const { data: vends } = vids.length
     ? await a.from('vendors').select('id,commission_rate').in('id', vids)
     : { data: [] as any[] };
-  const rateOf = (vid: any) => {
+
+  // Pre-compute each valid line + each vendor's slice of THIS order (Aura Smart tiers on it).
+  const vendorValue: Record<string, number> = {};
+  const parsed = items
+    .map((it: any) => {
+      const p: any = byId.get(Number(it.id));
+      if (!p) return null;
+      const qty = Math.max(1, Number(it.quantity) || 1);
+      const unit = Number(p.price);
+      const line = money(unit * qty);
+      if (p.vendor_id != null) vendorValue[String(p.vendor_id)] = (vendorValue[String(p.vendor_id)] || 0) + line;
+      return { it, p, qty, unit, line };
+    })
+    .filter(Boolean) as any[];
+  if (!parsed.length) throw error(400, 'No valid products in your cart');
+
+  // Commission config (Storage-backed). mode 'aura' = Aura Smart decides every sale (6–11%);
+  // mode 'fixed' = each vendor's own commission_rate (or base). For Aura mode, pull vendor
+  // avg ratings (best-effort — a better-rated shop earns a lower rate).
+  const cfg = normalizeCommission((await readSiteConfig()).commission);
+  let ratingByVendor: Record<string, number> = {};
+  if (cfg.mode === 'aura' && vids.length) {
+    try {
+      const { data: revs } = await a.from('reviews').select('vendor_id,rating').eq('status', 'PUBLISHED').in('vendor_id', vids);
+      const agg: Record<string, { s: number; c: number }> = {};
+      for (const r of revs || []) {
+        const k = String(r.vendor_id);
+        (agg[k] ??= { s: 0, c: 0 });
+        agg[k].s += Number(r.rating) || 0;
+        agg[k].c += 1;
+      }
+      ratingByVendor = Object.fromEntries(Object.entries(agg).map(([k, v]) => [k, v.c ? v.s / v.c : 0]));
+    } catch {
+      /* reviews table absent → rating 0 */
+    }
+  }
+  const rateFor = (vid: any): number => {
+    const key = String(vid);
+    if (cfg.mode === 'aura') return computeAuraCommission(cfg, vendorValue[key] || 0, ratingByVendor[key] || 0);
     const r = (vends || []).find((v: any) => v.id === vid)?.commission_rate;
-    return r === null || r === undefined ? DEFAULT_COMMISSION : Number(r);
+    return r === null || r === undefined ? cfg.base : Number(r);
   };
 
   let subtotal = 0, commissionTotal = 0, payoutTotal = 0;
   const lineItems: any[] = [];
-  for (const it of items) {
-    const p: any = byId.get(Number(it.id));
-    if (!p) continue; // ignore items not present in the live catalog
-    const qty = Math.max(1, Number(it.quantity) || 1);
-    const unit = Number(p.price);
-    const line = money(unit * qty);
-    const rate = rateOf(p.vendor_id);
+  for (const { it, p, qty, unit, line } of parsed) {
+    const rate = rateFor(p.vendor_id);
     const commission = money((line * rate) / 100);
     const payout = money(line - commission);
     subtotal += line; commissionTotal += commission; payoutTotal += payout;

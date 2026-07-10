@@ -17,6 +17,17 @@
   let error: string | null = $state(null);
   let suggestion: string | null = $state(null);
 
+  // Try-On picker shows real garments only (no cosmetics), current product's category first.
+  const APPAREL = ['saree', 'panjabi', 'shirt', 't-shirt', 'pant', 'three-piece'];
+  const tryOnPicks = $derived.by(() => {
+    const garments = allProducts.filter((p) => APPAREL.includes(String((p as any).category || '').toLowerCase()));
+    const cat = String(product?.category || '').toLowerCase();
+    return [
+      ...garments.filter((p) => String((p as any).category || '').toLowerCase() === cat),
+      ...garments.filter((p) => String((p as any).category || '').toLowerCase() !== cat)
+    ].slice(0, 8);
+  });
+
   $effect(() => {
     allProducts = getProducts();
     const id = $page.params.id;
@@ -34,17 +45,6 @@
       setSuggestion(null);
     }
   });
-
-  async function convertUrlToBase64(url: string): Promise<string> {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
 
   async function processFile(file: File, type: 'user' | 'product') {
     try {
@@ -88,13 +88,15 @@
     error = null;
 
     try {
-      let productBase64 = '';
+      // Pass the product image straight through (URL or data-URL) — the server fetches URLs
+      // itself (no CORS), so catalog products work without a flaky client-side fetch.
+      let productBase64 = productImage;
 
-      if (productImage.startsWith('data:')) {
+      if (false) {
         productBase64 = productImage;
       } else {
         try {
-          productBase64 = await convertUrlToBase64(productImage);
+          productBase64 = productImage;
         } catch {
           error = 'ইকোসিস্টেমের ছবি অ্যাক্সেস করতে সমস্যা হচ্ছে। দয়া করে আপনার ডিভাইসে ছবিটি ডাউনলোড করে আপলোড করুন।';
           isProcessing = false;
@@ -233,7 +235,7 @@
             <ShoppingBag size={12} /> কালেকশন থেকে বেছে নিন
           </h3>
           <div class="grid grid-cols-4 gap-2">
-            {#each allProducts.slice(0, 4) as p}
+            {#each tryOnPicks as p}
               <button onclick={() => selectCatalogProduct(p)}
                 class="aspect-square rounded-lg overflow-hidden border transition-all cursor-pointer {product?.id === p.id ? 'border-aura-green scale-95 ring-2 ring-aura-green/20' : 'border-white/5 hover:border-white/20'}">
                 <img src={p.imageUrl} alt={p.name} class="w-full h-full object-cover" />
