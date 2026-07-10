@@ -9,7 +9,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   const host = event.url.hostname.toLowerCase();
   const path = event.url.pathname;
   if (
-    (path === '/admin' || path.startsWith('/admin/')) &&
+    (path === '/admin' || path === '/admin-login' || path.startsWith('/admin/')) &&
     host.endsWith('snehalata.com') &&
     host !== 'admin.snehalata.com'
   ) {

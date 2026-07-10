@@ -214,7 +214,7 @@
     localStorage.removeItem('aura_admin_token');
     localStorage.removeItem('aura_admin_pass');
     isAuthenticated = false;
-    window.location.hash = '/admin-login';
+    window.location.href = '/admin-login';
   }
 
   // Per-vendor sales intelligence — computed from REAL orders (dbOrders → items[]).
@@ -294,7 +294,7 @@
     if (!browser) return;
     const token = localStorage.getItem('aura_admin_token');
     if (!token) {
-      window.location.hash = '/admin-login';
+      window.location.href = '/admin-login';
     } else {
       isAuthenticated = true;
       loadData();
