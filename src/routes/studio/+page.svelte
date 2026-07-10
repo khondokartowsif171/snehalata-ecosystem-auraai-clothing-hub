@@ -5,7 +5,7 @@
   import {
     Sparkles, Loader2, Download, Layers, Zap, X,
     Camera, RefreshCw, CheckCircle2, User,
-    Upload, Palette, Sliders, Info, Ruler, Scan
+    Upload, Palette, Sliders, Info, Ruler, Scan, ShoppingBag, Share2
   } from '@lucide/svelte';
   import { generateTryOnTransformation, generateStyleTransfer, generateMakeupTryOn } from '$lib/geminiService';
   import { getProducts, getVendors } from '$lib/mockData';
@@ -185,6 +185,49 @@
       isProcessing = false;
     }
   };
+
+  // Result actions — actually add the tried-on product to the cart (was just a /cart link),
+  // + download / share the generated look.
+  let addedToCart = $state(false);
+  function addStudioToCart() {
+    const p = result?.product;
+    if (!p) return;
+    try {
+      const cart = JSON.parse(localStorage.getItem('aura_cart') || '[]');
+      const i = cart.findIndex((x: any) => x.id === p.id);
+      if (i > -1) cart[i].quantity += 1;
+      else cart.push({ ...p, quantity: 1, size: null });
+      localStorage.setItem('aura_cart', JSON.stringify(cart));
+      window.dispatchEvent(new Event('cartUpdated'));
+      addedToCart = true;
+      setTimeout(() => (addedToCart = false), 2200);
+    } catch {
+      /* ignore storage errors */
+    }
+  }
+
+  async function shareResult() {
+    const url = result?.url;
+    if (!url) return;
+    const text = result?.product ? `আমার Aura Try-On — ${result.product.name} · Snehalata` : 'আমার Aura Try-On লুক · Snehalata';
+    try {
+      const blob = await (await fetch(url)).blob();
+      const file = new File([blob], 'aura-tryon.png', { type: blob.type || 'image/png' });
+      if ((navigator as any).canShare?.({ files: [file] })) {
+        await (navigator as any).share({ files: [file], text });
+        return;
+      }
+    } catch {
+      /* fall through to link share */
+    }
+    try {
+      if (navigator.share) { await navigator.share({ text, url: 'https://www.snehalata.com' }); return; }
+      await navigator.clipboard.writeText(text + ' https://www.snehalata.com');
+      alert('লিংক কপি হয়েছে!');
+    } catch {
+      /* ignore */
+    }
+  }
 
   const STYLE_VIBES = ['Vintage Heritage', 'Classic Oil', 'Sketch', 'Studio Portrait', 'Golden Hour', 'Editorial'];
   const PRODUCT_CATEGORIES = ['All', 'Saree', 'Panjabi', 'Three-Piece', 'Borka', 'Shirt', 'T-Shirt', 'Pant', 'Baby'];
@@ -426,20 +469,32 @@
               {#if result.type === 'TRYON'}
                 <div transition:scale class="relative w-full h-full duration-700">
                   <img src={result.url} class="w-full h-full object-contain rounded-3xl" alt="Try-on result" />
-                  <div class="absolute top-6 left-6 flex items-center gap-3 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10">
+                  <div class="absolute top-6 left-6 flex items-center gap-3 bg-black/60 backdrop-blur-md px-5 py-3 rounded-full border border-white/10">
                     <CheckCircle2 size={16} class="text-green-400" />
                     <span class="text-[10px] font-black uppercase tracking-widest text-white">Neural Try-On Complete</span>
                   </div>
-                  <div class="absolute bottom-6 right-6 p-6 bg-aura-glass backdrop-blur-3xl border border-aura-glassBorder rounded-[2rem] flex items-center gap-6 shadow-2xl">
-                    <div class="w-16 h-16 rounded-xl overflow-hidden border border-white/10">
+                  <div class="absolute top-6 right-6 flex items-center gap-2">
+                    <a href={result.url} download="aura-tryon.png" title="Download" aria-label="Download look" class="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white hover:bg-white hover:text-black transition-all"><Download size={18} /></a>
+                    <button type="button" onclick={shareResult} title="Share" aria-label="Share look" class="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white hover:bg-white hover:text-black transition-all cursor-pointer"><Share2 size={18} /></button>
+                  </div>
+                  <div class="absolute bottom-6 left-6 right-6 sm:left-auto p-4 sm:p-6 bg-aura-glass backdrop-blur-3xl border border-aura-glassBorder rounded-[2rem] flex items-center gap-4 sm:gap-6 shadow-2xl">
+                    <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-white/10 shrink-0">
                       <img src={result.product.imageUrl} class="w-full h-full object-cover" alt={result.product.name} />
                     </div>
-                    <div>
+                    <div class="min-w-0 flex-1">
                       <div class="text-[10px] font-black uppercase tracking-widest text-aura-green mb-1">{result.product.category}</div>
-                      <div class="text-white font-bold">{result.product.name}</div>
+                      <div class="text-white font-bold truncate">{result.product.name}</div>
                       <div class="text-aura-gold font-mono text-sm mt-1">৳{result.product.price.toLocaleString()}</div>
                     </div>
-                    <a href="/cart" class="px-6 py-3 bg-white text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-aura-green hover:text-white transition-all">Add to Cart</a>
+                    <div class="flex flex-col gap-2 shrink-0">
+                      <button type="button" onclick={addStudioToCart}
+                        class="px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer {addedToCart ? 'bg-green-500 text-white' : 'bg-white text-black hover:bg-aura-green hover:text-white'}">
+                        {#if addedToCart}<CheckCircle2 size={14} /> Added{:else}<ShoppingBag size={14} /> Add to Cart{/if}
+                      </button>
+                      {#if addedToCart}
+                        <a href="/cart" class="text-[9px] font-black uppercase tracking-widest text-aura-green text-center hover:text-white transition-colors">View Cart →</a>
+                      {/if}
+                    </div>
                   </div>
                 </div>
               {/if}
@@ -456,9 +511,13 @@
               {#if result.type === 'MAKEUP'}
                 <div transition:scale class="relative w-full h-full duration-700">
                   <img src={result.url} class="w-full h-full object-contain rounded-3xl" alt="Makeup try-on result" />
-                  <div class="absolute top-6 left-6 flex items-center gap-3 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10">
+                  <div class="absolute top-6 left-6 flex items-center gap-3 bg-black/60 backdrop-blur-md px-5 py-3 rounded-full border border-white/10">
                     <CheckCircle2 size={16} class="text-green-400" />
                     <span class="text-[10px] font-black uppercase tracking-widest text-white">Makeup Applied</span>
+                  </div>
+                  <div class="absolute top-6 right-6 flex items-center gap-2">
+                    <a href={result.url} download="aura-makeup.png" title="Download" aria-label="Download look" class="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white hover:bg-white hover:text-black transition-all"><Download size={18} /></a>
+                    <button type="button" onclick={shareResult} title="Share" aria-label="Share look" class="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white hover:bg-white hover:text-black transition-all cursor-pointer"><Share2 size={18} /></button>
                   </div>
                   {#if result.shade}
                     <div class="absolute bottom-6 right-6 flex items-center gap-3 bg-aura-glass backdrop-blur-3xl border border-aura-glassBorder rounded-full pl-3 pr-5 py-2 shadow-2xl">
