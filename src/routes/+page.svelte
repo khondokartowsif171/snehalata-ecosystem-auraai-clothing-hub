@@ -2,7 +2,7 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { fade, fly } from 'svelte/transition';
-  import { Search, LayoutGrid, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, Menu, X, Filter, Globe, Store, History, Camera, Sparkles, Play, Truck, Lock, ChevronDown, Wallet } from '@lucide/svelte';
+  import { Search, LayoutGrid, ChevronRight, TrendingUp, Zap, ArrowRight, ShieldCheck, Menu, X, Filter, Globe, Store, History, Camera, Sparkles, Play, Truck, Lock, ChevronDown, Wallet, Shirt, MapPin } from '@lucide/svelte';
   import ProductCard from '$lib/components/ProductCard.svelte';
   import { priceStats, fairVerdict } from '$lib/fairPrice';
   import { getProducts, getVendors } from '$lib/mockData';
@@ -196,12 +196,23 @@
     return () => clearInterval(id);
   });
 
-  const TRUST_PILLS = [
-    { icon: Sparkles, en: 'AI-Powered Smart Shopping', bn: 'এআই-চালিত স্মার্ট শপিং' },
-    { icon: ShieldCheck, en: 'Neural Verified Vendors', bn: 'যাচাইকৃত বিক্রেতা' },
-    { icon: Lock, en: 'Secure & Safe Transactions', bn: 'নিরাপদ লেনদেন' },
-    { icon: Truck, en: 'Fast Delivery Across BD', bn: 'দ্রুত ডেলিভারি' }
+  // Aura feature strip — recreates the "AI Powered Smart Shopping" poster's icon row as
+  // real, tappable, responsive chips (each navigates to its feature). Replaces the 4 boxes.
+  const HERO_FEATURES = [
+    { icon: ShieldCheck, label: 'Neural Verified', href: '#trust-banner' },
+    { icon: Shirt, label: 'AR Try-On', href: '/studio' },
+    { icon: Search, label: 'Neural Search', action: 'search' },
+    { icon: Globe, label: 'Live Market', href: '#collection' },
+    { icon: Lock, label: 'Secure Payment', href: '#trust-banner' },
+    { icon: Truck, label: 'Fast Delivery', href: '#trust-banner' },
+    { icon: MapPin, label: 'Live Track', href: '/orders' },
+    { icon: Wallet, label: 'সাধ্য · Everyone', href: '#budget' }
   ];
+  function focusNeuralSearch() {
+    if (!browser) return;
+    const el = document.querySelector('input[placeholder^="Neural"], input[placeholder*="ভয়েস"]') as HTMLInputElement | null;
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
+  }
 
   const SITE_URL = 'https://www.snehalata.com';
   let jsonLd = $derived(
@@ -442,9 +453,10 @@
 
   <!-- HERO — BD map background + BD→global network overlay + rotating text -->
   <section class="relative overflow-hidden border-b border-aura-green/10">
-    <!-- Bangladesh map image — small centred at top on mobile, full-bleed texture on desktop -->
-    <img src="/bd-map.webp" alt="" aria-hidden="true" class="absolute inset-0 h-full w-full object-contain object-center scale-[1.45] opacity-30 sm:scale-100 sm:object-cover sm:opacity-45" />
-    <div class="absolute inset-0 bg-[#080b09]/[0.6]"></div>
+    <!-- Aura "Neural Verified" shield-badge backdrop — premium brand texture, darkened so the
+         rotating hero text + CTAs stay readable (like the old map, but on-brand). -->
+    <img src="/aura-hero-bg.jpg" alt="" aria-hidden="true" class="absolute inset-0 h-full w-full object-cover object-center opacity-40" />
+    <div class="absolute inset-0 bg-gradient-to-b from-[#080b09]/72 via-[#080b09]/58 to-[#080b09]/82"></div>
     <div class="absolute inset-0 neural-grid pointer-events-none opacity-25"></div>
 
     <!-- BD → global network: origin over BD, arcs radiating out to world nodes -->
@@ -495,22 +507,31 @@
     </div>
   </section>
 
-  <!-- TRUST PILLS -->
-  <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-8">
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      {#each TRUST_PILLS as t}
-        {@const Icon = t.icon}
-        <div class="bg-aura-card border border-aura-green/14 rounded-2xl p-4 flex flex-col items-center text-center gap-2.5">
-          <div class="w-10 h-10 rounded-xl bg-aura-green/10 flex items-center justify-center text-aura-green shrink-0"><Icon size={18} /></div>
-          <span class="text-[11px] font-bold text-aura-cream leading-tight">{t.en}</span>
-          <span class="font-bengali text-[9px] text-aura-dim">{t.bn}</span>
-        </div>
+  <!-- AURA FEATURE STRIP — the "AI Powered Smart Shopping" poster, recreated as tappable chips -->
+  <section class="max-w-7xl mx-auto px-3 sm:px-6 mt-6">
+    <div class="text-center mb-4">
+      <p class="font-display text-[10px] sm:text-[11px] font-black uppercase tracking-[0.35em] text-aura-green/90">AI Powered Smart Shopping</p>
+    </div>
+    <div class="flex sm:justify-center gap-3 sm:gap-5 overflow-x-auto no-scrollbar pb-1 px-1">
+      {#each HERO_FEATURES as f}
+        {@const Icon = f.icon}
+        {#if f.action === 'search'}
+          <button type="button" onclick={focusNeuralSearch} class="shrink-0 flex flex-col items-center gap-2 w-[74px] group">
+            <span class="w-14 h-14 rounded-full border border-aura-green/40 bg-aura-green/[0.06] flex items-center justify-center text-aura-green shadow-[0_0_18px_rgba(16,185,129,0.18)] group-hover:border-aura-green group-hover:shadow-[0_0_26px_rgba(16,185,129,0.4)] transition-all"><Icon size={20} /></span>
+            <span class="text-[9px] font-bold text-[#cfe8dd] text-center leading-tight">{f.label}</span>
+          </button>
+        {:else}
+          <a href={f.href} class="shrink-0 flex flex-col items-center gap-2 w-[74px] group">
+            <span class="w-14 h-14 rounded-full border border-aura-green/40 bg-aura-green/[0.06] flex items-center justify-center text-aura-green shadow-[0_0_18px_rgba(16,185,129,0.18)] group-hover:border-aura-green group-hover:shadow-[0_0_26px_rgba(16,185,129,0.4)] transition-all"><Icon size={20} /></span>
+            <span class="text-[9px] font-bold text-[#cfe8dd] text-center leading-tight">{f.label}</span>
+          </a>
+        {/if}
       {/each}
     </div>
   </section>
 
   <!-- NEURAL VERIFIED banner -->
-  <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-5">
+  <section id="trust-banner" class="max-w-7xl mx-auto px-5 sm:px-6 mt-5 scroll-mt-24">
     <button type="button" onclick={() => bannerExpanded = !bannerExpanded}
       class="w-full text-left rounded-2xl border border-aura-green/30 bg-[linear-gradient(120deg,rgba(16,185,129,0.14),rgba(199,154,62,0.05))] p-4 sm:p-5">
       <div class="flex items-center gap-3">
@@ -530,7 +551,7 @@
   </section>
 
   <!-- সাধ্য (Budget) Mode — your budget, the best authentic value within it -->
-  <section class="max-w-7xl mx-auto px-5 sm:px-6 mt-5">
+  <section id="budget" class="max-w-7xl mx-auto px-5 sm:px-6 mt-5 scroll-mt-24">
     <div class="rounded-2xl border border-aura-green/25 bg-[linear-gradient(135deg,rgba(16,185,129,0.10),rgba(199,154,62,0.05))] p-4 sm:p-5">
       <div class="flex items-center gap-3 mb-3.5">
         <div class="w-9 h-9 rounded-xl bg-aura-green/16 flex items-center justify-center text-aura-green shrink-0"><Wallet size={18} /></div>
