@@ -103,6 +103,37 @@ async function fromShopify(origin: string): Promise<ImportedProduct[]> {
   return out.filter((p) => p.name);
 }
 
+// ── 1b. WooCommerce Store API (public, no auth) — the full catalog as JSON on any WP/Woo
+// store. A huge share of BD shops run WooCommerce, which has NO /products.json (that's
+// Shopify) but DOES expose /wp-json/wc/store/v1/products. Prices are in minor units. ──
+async function fromWooStore(origin: string): Promise<ImportedProduct[]> {
+  const out: ImportedProduct[] = [];
+  for (const base of [`${origin}/wp-json/wc/store/v1/products`, `${origin}/wp-json/wc/store/products`]) {
+    for (let page = 1; page <= 4; page++) {
+      const data = await httpGet(`${base}?per_page=100&page=${page}`, 10000);
+      const list = Array.isArray(data) ? data : null;
+      if (!list || !list.length) break;
+      for (const p of list) {
+        const minor = Number(p?.prices?.currency_minor_unit ?? 2);
+        const raw = p?.prices?.price ?? p?.prices?.sale_price ?? p?.prices?.regular_price;
+        const price = raw != null && raw !== '' ? Number(raw) / Math.pow(10, minor) : 0;
+        out.push({
+          name: String(p?.name || '').trim(),
+          price: Number.isFinite(price) ? price : 0,
+          imageUrl: p?.images?.[0]?.src ? String(p.images[0].src) : '',
+          description: cheerio.load(String(p?.short_description || '')).text().trim().slice(0, 500),
+          category: Array.isArray(p?.categories) && p.categories[0]?.name ? String(p.categories[0].name) : undefined,
+          url: p?.permalink ? String(p.permalink) : undefined,
+          confidence: 100
+        });
+      }
+      if (list.length < 100) break;
+    }
+    if (out.length) break; // v1 worked → skip the legacy path
+  }
+  return out.filter((p) => p.name);
+}
+
 // ── 2. JSON-LD Product schema (Shopify, Woo, Wix, most SEO'd customs emit this) ──
 // Deep-walks the whole graph so it catches BOTH plain `Product` nodes AND the nested
 // `Store → OfferCatalog → Offer → itemOffered:Product` shape (price sits on the Offer).
@@ -252,6 +283,10 @@ export async function scrapeProducts(url: string): Promise<ImportedProduct[]> {
   // 1. Shopify feed — the cleanest, whole-catalog path.
   const shopify = await fromShopify(origin);
   if (shopify.length) return dedupeByName(shopify);
+
+  // 1b. WooCommerce Store API — full catalog on any WP/Woo store.
+  const woo = await fromWooStore(origin);
+  if (woo.length) return dedupeByName(woo);
 
   const html = await httpGet(target, 12000);
   if (typeof html === 'string') {

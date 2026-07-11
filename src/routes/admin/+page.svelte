@@ -9,6 +9,66 @@
   import { BD_LOCATIONS } from '$lib/locationData';
   import { ECO_CATEGORIES } from '$lib/categories';
   import { siteCategories } from '$lib/ui';
+  import { fileToCompressedDataURL } from '$lib/imageUpload';
+
+  // ── Admin Import Console — run website-sync / deep-import / photo AI import for ANY vendor ──
+  let importVendorId = $state<number | null>(null);
+  let importUrl = $state('');
+  let importBusy = $state('');       // '', 'set-url', 'sync', 'deep', 'photos'
+  let importMsg = $state('');
+  let importPhotoProgress = $state('');
+  function selectImportVendor(id: number) {
+    importVendorId = id;
+    const v = vendors.find((x: any) => x.id === id) as any;
+    importUrl = v?.website_url || '';
+    importMsg = '';
+  }
+  async function importCall(body: any) {
+    const res = await fetch('/api/admin/vendor-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass() },
+      body: JSON.stringify({ vendorId: importVendorId, ...body })
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
+    return d;
+  }
+  async function importSaveUrl() {
+    if (!importVendorId) return;
+    importBusy = 'set-url'; importMsg = '';
+    try { const d = await importCall({ action: 'set-url', website_url: importUrl }); importUrl = d.website_url || importUrl; importMsg = 'ওয়েবসাইট লিংক সেভ হয়েছে ✓'; loadData(); }
+    catch (e: any) { importMsg = 'Save failed: ' + (e?.message || 'error'); }
+    finally { importBusy = ''; }
+  }
+  async function importSync() {
+    if (!importVendorId) return;
+    importBusy = 'sync'; importMsg = 'ওয়েবসাইট থেকে আনা হচ্ছে…';
+    try { const d = await importCall({ action: 'sync' }); importMsg = `Sync: ${d.imported ?? 0} নতুন পণ্য (সাইটে ${d.found ?? 0}টি পাওয়া গেছে) → Review ট্যাবে approve করুন।`; loadData(); }
+    catch (e: any) { importMsg = 'Sync failed: ' + (e?.message || 'error'); }
+    finally { importBusy = ''; }
+  }
+  async function importDeep() {
+    if (!importVendorId) return;
+    importBusy = 'deep'; importMsg = 'সাইট render করে আনা হচ্ছে (একটু সময় লাগবে)…';
+    try { const d = await importCall({ action: 'deep' }); importMsg = `Deep Import: ${d.imported ?? 0} নতুন পণ্য (${d.found ?? 0}টি detect) → Review ট্যাবে।`; loadData(); }
+    catch (e: any) { importMsg = 'Deep import: ' + (e?.message || 'unavailable'); }
+    finally { importBusy = ''; }
+  }
+  async function importPhotos(e: Event) {
+    if (!importVendorId) return;
+    const input = e.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    importBusy = 'photos'; importMsg = ''; let ok = 0;
+    for (let i = 0; i < files.length; i++) {
+      importPhotoProgress = `ছবি ${i + 1}/${files.length} প্রসেস হচ্ছে…`;
+      try { const dataUrl = await fileToCompressedDataURL(files[i]); await importCall({ action: 'photo', image: dataUrl }); ok++; }
+      catch { /* skip a bad photo, keep going */ }
+    }
+    importPhotoProgress = '';
+    importMsg = `${ok}/${files.length} ছবি থেকে পণ্য বানানো হয়েছে → Review ট্যাবে approve করুন।`;
+    importBusy = ''; input.value = ''; loadData();
+  }
 
   // ── Aura Control Center — home config (categories + featured), Storage-backed ──
   type HomeCat = { id: string; name: string; cover: string; active: boolean; order: number };
@@ -111,7 +171,7 @@
   // Derived subdomain for a vendor (matches src/hooks.ts slug reroute).
   const subdomainFor = (v: any) => `${v.slug}.snehalata.com`;
 
-  type Tab = 'OVERVIEW' | 'VENDORS' | 'PRODUCTS' | 'REVIEW' | 'ORDERS' | 'CATEGORIES' | 'TRACKING';
+  type Tab = 'OVERVIEW' | 'VENDORS' | 'IMPORT' | 'PRODUCTS' | 'REVIEW' | 'ORDERS' | 'CATEGORIES' | 'TRACKING';
 
   let isAuthenticated = $state(false);
   let stats = $state<EcosystemStats | null>(null);
@@ -550,6 +610,10 @@
               <span class="ml-1 px-2 py-0.5 bg-amber-500 text-black rounded-full text-[9px] font-black animate-pulse" title="{pendingCount} pending approval">{pendingCount}</span>
             {/if}
           </button>
+          <button onclick={() => activeTab = 'IMPORT'} class={tabBtnClass('IMPORT')}>
+            <span class="{activeTab === 'IMPORT' ? 'text-white' : 'text-gray-600'} group-hover:text-aura-green transition-colors"><Upload size={14} /></span>
+            <span>Import</span>
+          </button>
           <button onclick={() => activeTab = 'PRODUCTS'} class={tabBtnClass('PRODUCTS')}>
             <span class="{activeTab === 'PRODUCTS' ? 'text-white' : 'text-gray-600'} group-hover:text-aura-green transition-colors"><Package size={14} /></span>
             <span>Inventory</span>
@@ -802,6 +866,62 @@
                 </tbody>
               </table>
             </div>
+          </div>
+
+        {:else if activeTab === 'IMPORT'}
+          <div transition:fade={{ duration: 500 }} class="space-y-6">
+            <div>
+              <h2 class="text-2xl font-serif font-black text-white">Import Console</h2>
+              <p class="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-1">যেকোনো vendor-এর পণ্য import করুন — website / deep render / ছবি-ফোল্ডার (AI)</p>
+            </div>
+
+            <!-- 1. pick a vendor -->
+            <div class="bg-white/[0.03] border border-white/10 rounded-3xl p-5 space-y-3">
+              <label class="text-[10px] font-black uppercase tracking-widest text-aura-green">১. Vendor বেছে নিন</label>
+              <select value={importVendorId} onchange={(e) => selectImportVendor(Number((e.target as HTMLSelectElement).value))}
+                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-aura-green appearance-none cursor-pointer">
+                <option value={null} class="bg-black">— vendor select করুন —</option>
+                {#each vendors as v}
+                  <option value={v.id} class="bg-black">{v.store_name} (#{v.id})</option>
+                {/each}
+              </select>
+            </div>
+
+            {#if importVendorId}
+              <!-- 2. website link + sync/deep -->
+              <div class="bg-white/[0.03] border border-white/10 rounded-3xl p-5 space-y-3">
+                <label class="text-[10px] font-black uppercase tracking-widest text-aura-green">২. ওয়েবসাইট থেকে import</label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <input type="text" bind:value={importUrl} placeholder="https://vendorsite.com" class="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-700 focus:outline-none focus:border-aura-green" />
+                  <button onclick={importSaveUrl} disabled={!!importBusy} class="px-5 py-3 bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all disabled:opacity-50">{importBusy === 'set-url' ? '…' : 'URL Save'}</button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button onclick={importSync} disabled={!!importBusy} class="px-6 py-3 bg-aura-green text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all disabled:opacity-50 flex items-center gap-2">
+                    {#if importBusy === 'sync'}<Loader2 size={14} class="animate-spin" />{:else}<Globe size={14} />{/if} Sync from Website
+                  </button>
+                  <button onclick={importDeep} disabled={!!importBusy} class="px-6 py-3 bg-white/5 border border-aura-ai/30 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-aura-ai transition-all disabled:opacity-50 flex items-center gap-2">
+                    {#if importBusy === 'deep'}<Loader2 size={14} class="animate-spin" />{:else}<Zap size={14} />{/if} Deep Import (render)
+                  </button>
+                </div>
+                <p class="text-[10px] text-gray-600">Shopify / WooCommerce / JSON-LD সব ধরনের সাইট। না পারলে "Deep Import" সাইট render করে চেষ্টা করে।</p>
+              </div>
+
+              <!-- 3. photo / folder AI import -->
+              <div class="bg-white/[0.03] border border-white/10 rounded-3xl p-5 space-y-3">
+                <label class="text-[10px] font-black uppercase tracking-widest text-aura-green">৩. ছবি / ফোল্ডার থেকে import (AI)</label>
+                <p class="text-[11px] text-gray-400">প্রোডাক্টের ছবিগুলো (একসাথে অনেকগুলো) সিলেক্ট করুন — Aura প্রতিটা থেকে নাম/দাম/বর্ণনা বানিয়ে pending listing বানাবে।</p>
+                <label class="inline-flex items-center gap-2 px-6 py-3 bg-aura-gold/10 border border-aura-gold/30 text-aura-gold rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-aura-gold/20 transition-all {importBusy ? 'opacity-50 pointer-events-none' : ''}">
+                  <Upload size={14} /> ছবি সিলেক্ট করুন (multiple)
+                  <input type="file" accept="image/*" multiple onchange={importPhotos} class="hidden" disabled={!!importBusy} />
+                </label>
+                {#if importPhotoProgress}<p class="text-[11px] text-aura-green font-bold">{importPhotoProgress}</p>{/if}
+              </div>
+
+              {#if importMsg}
+                <div class="p-4 rounded-2xl border {importMsg.toLowerCase().includes('fail') || importMsg.includes('unavailable') ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-aura-green/10 border-aura-green/25 text-aura-green'} text-[12px] font-bold">{importMsg}</div>
+              {/if}
+              <p class="text-[11px] text-gray-500">সব import <span class="text-aura-gold font-bold">pending</span> হিসেবে আসে — <button onclick={() => activeTab = 'REVIEW'} class="text-aura-green underline">Review ট্যাবে</button> গিয়ে approve করুন।</p>
+            {/if}
           </div>
 
         {:else if activeTab === 'PRODUCTS'}

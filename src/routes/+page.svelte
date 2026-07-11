@@ -632,9 +632,6 @@
                 <Icon size={26} strokeWidth={1.6} />
               </div>
             {/if}
-            {#if !hasProducts(cat)}
-              <div class="absolute bottom-0 inset-x-0 bg-[#0a0f0d]/80 border-t border-aura-gold/30 py-0.5 text-[7.5px] font-black uppercase tracking-widest text-aura-gold text-center">শীঘ্রই</div>
-            {/if}
           </div>
           <div class="text-[11.5px] font-semibold text-[#dde5e1] mt-2 leading-tight">{cat.name}</div>
         </button>
