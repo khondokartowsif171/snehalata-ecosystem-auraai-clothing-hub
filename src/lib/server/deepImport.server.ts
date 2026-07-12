@@ -17,21 +17,24 @@ export async function renderAndExtract(
   try {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (compatible; AuraNeuralGrid/1.0; +https://www.snehalata.com)');
-    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 45000 }).catch(() => {});
+    // `domcontentloaded` (not `networkidle2`): many sites keep pinging trackers/chat/ads so the
+    // network NEVER goes idle → the old 45s wait blew the whole 60s function budget. DOM-ready +
+    // a scroll + a short settle is enough for lazy-loaded product grids and stays well inside budget.
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     // Trigger lazy-load: scroll the page in steps, then settle.
     await page.evaluate(async () => {
       await new Promise<void>((resolve) => {
         let y = 0;
         const step = () => {
           window.scrollTo(0, y);
-          y += 700;
-          if (y < document.body.scrollHeight && y < 12000) setTimeout(step, 180);
+          y += 800;
+          if (y < document.body.scrollHeight && y < 9000) setTimeout(step, 150);
           else resolve();
         };
         step();
       });
     });
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 1200));
 
     const items = await page.evaluate(() => {
       const priceRe = /(?:৳|Tk\.?|BDT|Rs\.?|\$)\s?[\d,]{2,}|[\d,]{3,}\s?(?:৳|টাকা|tk)/i;

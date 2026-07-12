@@ -38,7 +38,14 @@
       if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
       const store = d.vendor?.store_name || 'store';
       const tag = d.vendor?.created ? 'নতুন স্টোর তৈরি' : 'বিদ্যমান স্টোর';
-      importAnyMsg = `${d.imported ?? 0}টি পণ্য import হয়েছে → "${store}" (${tag}); সাইটে ${d.found ?? 0}টি পাওয়া গেছে। Review ট্যাবে approve করুন।`;
+      if ((d.imported ?? 0) > 0) {
+        importAnyMsg = `${d.imported}টি পণ্য import হয়েছে → "${store}" (${tag}); সাইটে ${d.found ?? 0}টি পাওয়া গেছে। Review ট্যাবে approve করুন।`;
+      } else if (!deep) {
+        // Fetch found no standard feed — the site is likely custom/SPA/Facebook. Guide the owner.
+        importAnyMsg = `এই সাইটে standard product feed (Shopify / WooCommerce / JSON-LD) পাওয়া গেল না — তাই 0 পণ্য। এখন "Deep (render)" বাটনে চাপুন (JS সাইটের জন্য), অথবা নিচে ছবি/ফোল্ডার import ব্যবহার করুন — ওটা যেকোনো সাইটে ১০০% কাজ করে। (স্টোর "${store}" তৈরি আছে)`;
+      } else {
+        importAnyMsg = `Deep render-ও এই সাইট থেকে পণ্য বের করতে পারল না (হয়তো login/JS-এর পেছনে) — সবচেয়ে নিশ্চিত উপায়: নিচের ছবি/ফোল্ডার import দিয়ে "${store}" স্টোরে পণ্য যোগ করুন।`;
+      }
       loadData();
     } catch (e: any) {
       importAnyMsg = 'Import failed: ' + (e?.message || 'error');

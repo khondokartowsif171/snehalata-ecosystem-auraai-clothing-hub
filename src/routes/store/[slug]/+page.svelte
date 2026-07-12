@@ -5,15 +5,14 @@
   import { ArrowLeft, Globe, MapPin } from '@lucide/svelte';
   import type { Vendor } from '$lib/types';
 
-  let vendor: Vendor | undefined = $state();
-  let products: any[] = $state([]);
+  let { data } = $props();
 
-  $effect(() => {
-    const slug = $page.params.slug;
-    const v = slug ? getVendorBySlug(slug) : undefined;
-    vendor = v;
-    products = v ? getProductsByVendor(Number(v.id)) : [];
-  });
+  // Prefer the SSR-resolved vendor/products (renders on the first paint, no client-store race).
+  // Fall back to the client catalog lookup only if SSR missed it (e.g. a Supabase timeout).
+  const vendor = $derived<Vendor | undefined>(data.vendor ?? getVendorBySlug($page.params.slug));
+  const products = $derived(
+    data.products?.length ? data.products : vendor ? getProductsByVendor(Number(vendor.id)) : []
+  );
 </script>
 
 {#if !vendor}
