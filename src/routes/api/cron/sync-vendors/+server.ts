@@ -3,6 +3,8 @@ import { env } from '$env/dynamic/private';
 import { adminClient, syncVendor, isApproved } from '$lib/server/vendorSync';
 import { embedText, moderateListing } from '$lib/server/gemini.server';
 import { withTimeout } from '$lib/seedCatalog';
+import { buildSiteUrls } from '$lib/server/siteUrls';
+import { pingIndexNow } from '$lib/server/indexnow.server';
 import type { RequestHandler } from './$types';
 
 // Safety-net: guarantee every product eventually gets embedded + moderated, even
@@ -67,5 +69,14 @@ export const GET: RequestHandler = async ({ request, url }) => {
   // Guarantee enrichment for any products the fast-path waitUntil may have missed.
   const enrich = await enrichPendingProducts(a);
 
-  return json({ ok: true, totalImported: total, vendors: results, enrich });
+  // Daily push of the full public URL set to Bing + Yandex (IndexNow) so new/updated
+  // products & stores get (re)crawled without waiting for organic discovery.
+  let indexnow: any = { ok: false, submitted: 0 };
+  try {
+    indexnow = await pingIndexNow((await buildSiteUrls()).map((u) => u.loc));
+  } catch (e: any) {
+    indexnow = { ok: false, submitted: 0, error: e?.message || 'indexnow failed' };
+  }
+
+  return json({ ok: true, totalImported: total, vendors: results, enrich, indexnow });
 };
