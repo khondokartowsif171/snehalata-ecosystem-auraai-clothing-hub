@@ -88,7 +88,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const shipping = String(c.district || '').toLowerCase() === 'dhaka' ? 78 : 118;
   const total = money(subtotal + shipping);
-  const method = ['COD', 'BKASH', 'NAGAD'].includes(pay.method) ? pay.method : 'COD';
+  const method = ['COD', 'BKASH', 'NAGAD', 'ONLINE'].includes(pay.method) ? pay.method : 'COD';
 
   const { data: order, error: oe } = await a.from('orders').insert({
     customer_name: c.name, customer_phone: c.phone, customer_email: c.email || null,

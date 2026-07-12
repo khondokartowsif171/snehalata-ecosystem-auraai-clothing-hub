@@ -162,6 +162,9 @@
         <a href="/tracking" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider text-gray-400 hover:text-white">
           <PackageSearch size={16} /> Track Order
         </a>
+        <a href="/guide" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider text-gray-400 hover:text-white">
+          <Sparkles size={16} /> কীভাবে ব্যবহার করবেন
+        </a>
         <a href="/orders" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider"
            class:text-aura-green={$page.url.pathname.startsWith('/orders')} class:text-gray-400={!$page.url.pathname.startsWith('/orders')}>
           <History size={16} /> My Orders

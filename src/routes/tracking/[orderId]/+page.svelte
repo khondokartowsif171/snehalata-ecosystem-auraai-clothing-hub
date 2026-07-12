@@ -39,6 +39,7 @@
         id: o.tracking || ('ORD-' + o.id),
         currentStatus: o.status,
         totalAmount: Number(o.total),
+        courierCode: o.courier_tracking_code || null,
         estimatedDelivery: o.district === 'Dhaka' ? '১-২ কার্যদিবস' : '২-৩ কার্যদিবস',
         items: (o.items || []).map((it: any) => ({ name: it.name, category: it.item_status || 'ITEM', imageUrl: it.image_url })),
         timeline: STATUS_FLOW.map((s, i) => ({
@@ -251,6 +252,20 @@
               </div>
             </div>
           </div>
+
+          {#if order.courierCode}
+            <div class="bg-aura-green/5 border border-aura-green/25 rounded-[2rem] p-5 sm:p-6 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <Truck class="text-aura-green" size={20} />
+                <div>
+                  <div class="text-[10px] uppercase tracking-widest font-black text-gray-500">Steadfast কুরিয়ার ট্র্যাকিং</div>
+                  <div class="text-sm font-black text-white tabular-nums">{order.courierCode}</div>
+                </div>
+              </div>
+              <a href={`https://steadfast.com.bd/t/${order.courierCode}`} target="_blank" rel="noreferrer"
+                class="px-4 py-2 rounded-xl bg-aura-green text-black text-[11px] font-black uppercase tracking-widest hover:brightness-110 transition-all">Live ট্র্যাক করুন →</a>
+            </div>
+          {/if}
 
           <div class="bg-aura-glass border border-aura-glassBorder rounded-[2.5rem] p-6 sm:p-10">
             <div class="flex justify-between items-center mb-8">

@@ -12,6 +12,7 @@ export const SITE_URL = 'https://www.snehalata.com';
 
 const STATIC_ROUTES: Array<{ path: string; priority: string; changefreq: string }> = [
   { path: '/', priority: '1.0', changefreq: 'daily' },
+  { path: '/guide', priority: '0.6', changefreq: 'monthly' },
   { path: '/studio', priority: '0.7', changefreq: 'weekly' },
   { path: '/onboarding', priority: '0.7', changefreq: 'monthly' },
   { path: '/cart', priority: '0.3', changefreq: 'monthly' },

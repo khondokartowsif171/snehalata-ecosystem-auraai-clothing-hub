@@ -298,6 +298,27 @@
     }
   }
 
+  let shippingId = $state<number | null>(null);
+  async function handleShip(id: number) {
+    if (shippingId) return;
+    shippingId = id;
+    try {
+      const res = await fetch('/api/admin/orders/ship', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass() },
+        body: JSON.stringify({ orderId: id })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
+      alert(`Steadfast-এ courier বুক হয়েছে ✓\nTracking: ${d.tracking_code || d.consignment_id || 'ok'}`);
+      await loadOrders();
+    } catch (err: any) {
+      alert('Courier booking failed: ' + (err?.message || 'error'));
+    } finally {
+      shippingId = null;
+    }
+  }
+
   async function loadPending() {
     try {
       const res = await fetch('/api/admin/products?pending=1', { headers: { 'x-admin-pass': adminPass() } });
@@ -1261,6 +1282,7 @@
                         <p class="text-white font-bold text-sm mt-1 truncate">{o.customer_name} · {o.customer_phone}</p>
                         <p class="text-[10px] text-gray-500 truncate">{o.district} · {o.area} — {o.address}</p>
                         {#if o.payment_txid}<p class="text-[9px] text-gray-600 font-mono">TxID: {o.payment_txid}</p>{/if}
+                        {#if o.courier_tracking_code}<p class="text-[9px] text-aura-green font-mono font-black">🚚 Steadfast: {o.courier_tracking_code}</p>{/if}
                       </div>
                       <div class="text-right shrink-0">
                         <p class="text-lg font-black text-white">৳{Number(o.total).toLocaleString()}</p>
@@ -1268,6 +1290,13 @@
                         <p class="text-[9px] text-gray-500 font-black uppercase tracking-widest">Payout ৳{Number(o.vendor_payout_total).toLocaleString()}</p>
                       </div>
                       <div class="flex items-center gap-2 shrink-0">
+                        {#if !o.courier_tracking_code}
+                          <button onclick={() => handleShip(o.id)} disabled={shippingId === o.id}
+                            class="px-3 py-2 rounded-xl bg-aura-green/15 border border-aura-green/30 text-aura-green text-[10px] font-black uppercase tracking-widest hover:bg-aura-green hover:text-black transition-all disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                            title="Steadfast কুরিয়ারে বুক করুন">
+                            {shippingId === o.id ? 'বুকিং…' : '🚚 Courier'}
+                          </button>
+                        {/if}
                         <select value={o.status} onchange={(e) => handleOrderStatus(o.id, e.currentTarget.value)}
                           class="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white outline-none cursor-pointer">
                           {#each ['PLACED', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'] as s}

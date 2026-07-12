@@ -19,6 +19,14 @@ export const GET: RequestHandler = async ({ url }) => {
     .from('order_items')
     .select('name, quantity, image_url, item_status, line_total')
     .eq('order_id', id);
+  // Courier fields (best-effort — degrade cleanly if the columns aren't migrated yet).
+  let courier: Record<string, unknown> = {};
+  try {
+    const { data: c } = await a.from('orders').select('courier_tracking_code, courier_status').eq('id', id).single();
+    if (c) courier = c;
+  } catch {
+    /* courier_* columns absent */
+  }
   const tracking = encodeTracking(o.id, new Date(o.created_at || Date.now()));
-  return json({ ok: true, order: { ...o, tracking, items: items || [] } });
+  return json({ ok: true, order: { ...o, ...courier, tracking, items: items || [] } });
 };

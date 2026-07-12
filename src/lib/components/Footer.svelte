@@ -21,6 +21,7 @@
       <h4 class="text-white font-bold uppercase tracking-widest text-xs mb-4">Shop</h4>
       <ul class="space-y-2 text-sm text-gray-400">
         <li><a href="/" class="hover:text-aura-green transition-colors">Browse Products</a></li>
+        <li><a href="/guide" class="hover:text-aura-green transition-colors">কীভাবে ব্যবহার করবেন · Guide</a></li>
         <li><a href="/studio" class="hover:text-aura-green transition-colors">Aura Studio · Try-On</a></li>
         <li><a href="/heritage" class="hover:text-aura-green transition-colors">তাঁতি ও মানবিকতা</a></li>
         <li><a href="/tracking" class="hover:text-aura-green transition-colors">Track My Order</a></li>

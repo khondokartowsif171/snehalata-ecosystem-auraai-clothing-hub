@@ -62,7 +62,7 @@
       error = 'Please fill in all required fields (Name, Phone, Address)';
       return;
     }
-    if (payMethod !== 'COD' && !payTxid.trim()) {
+    if ((payMethod === 'BKASH' || payMethod === 'NAGAD') && !payTxid.trim()) {
       error = `Please enter your ${payMethod === 'BKASH' ? 'bKash' : 'Nagad'} Transaction ID`;
       return;
     }
@@ -82,6 +82,19 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Could not place order');
+      // Online payment → hand off to SSLCommerz; the order stays PENDING until the gateway
+      // confirms (IPN marks it PAID). Keep the cart until success so a failed pay can retry.
+      if (payMethod === 'ONLINE') {
+        const pr = await fetch('/api/payment/sslcommerz/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: data.orderId })
+        });
+        const pd = await pr.json().catch(() => ({}));
+        if (!pr.ok || !pd.gatewayUrl) throw new Error(pd.message || 'অনলাইন পেমেন্ট শুরু করা যায়নি');
+        window.location.href = pd.gatewayUrl;
+        return;
+      }
       localStorage.removeItem('aura_cart');
       cartItems = [];
       window.dispatchEvent(new Event('cartUpdated'));
@@ -259,8 +272,8 @@
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
                   <Wallet size={14} class="text-aura-green" /> Payment Method
                 </h3>
-                <div class="grid grid-cols-3 gap-3">
-                  {#each [['COD', 'Cash on Delivery'], ['BKASH', 'bKash'], ['NAGAD', 'Nagad']] as opt}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {#each [['COD', 'ক্যাশ অন ডেলিভারি'], ['ONLINE', 'অনলাইন পেমেন্ট'], ['BKASH', 'bKash (ম্যানুয়াল)'], ['NAGAD', 'Nagad (ম্যানুয়াল)']] as opt}
                     <button type="button" onclick={() => payMethod = opt[0]}
                       class="p-3 sm:p-4 rounded-2xl border text-center transition-all {payMethod === opt[0] ? 'border-aura-green bg-[#f5f0e6] ring-2 ring-aura-green/15' : 'border-gray-100 bg-white hover:border-gray-300'}">
                       <span class="text-[10px] sm:text-[11px] font-black text-gray-900 leading-tight block">{opt[1]}</span>
@@ -270,6 +283,10 @@
                 {#if payMethod === 'COD'}
                   <p class="mt-4 text-[11px] text-gray-600 bg-gray-50 border border-gray-100 rounded-xl p-4 leading-relaxed">
                     ডেলিভারির সময় নগদ পরিশোধ করুন — কোনো অগ্রিম টাকা লাগবে না। <span class="text-gray-400">(Cash on Delivery)</span>
+                  </p>
+                {:else if payMethod === 'ONLINE'}
+                  <p class="mt-4 text-[11px] text-gray-700 bg-[#f5f0e6] border border-[#e2d9c9] rounded-xl p-4 leading-relaxed">
+                    <b>কার্ড · bKash · Nagad · Rocket · নেট ব্যাংকিং</b> — সুরক্ষিত <b class="text-aura-green">SSLCommerz</b> gateway-এ ৳{total.toLocaleString()} পরিশোধ করুন। "পেমেন্ট করুন" চাপলে সুরক্ষিত পেমেন্ট পেজে নিয়ে যাওয়া হবে।
                   </p>
                 {:else}
                   <div class="mt-4 space-y-3 bg-[#f5f0e6] border border-[#e2d9c9] rounded-xl p-4">
@@ -289,7 +306,7 @@
               {/if}
 
               <button onclick={handlePlaceOrder} disabled={placing} class="w-full py-6 bg-aura-ink text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:bg-aura-green transition-all flex items-center justify-center gap-4 active:scale-95 disabled:opacity-60">
-                <CheckCircle2 size={18} /> {placing ? 'PLACING ORDER…' : 'CONFIRM & PLACE ORDER'}
+                <CheckCircle2 size={18} /> {placing ? 'PLACING ORDER…' : payMethod === 'ONLINE' ? 'পেমেন্ট করুন →' : 'CONFIRM & PLACE ORDER'}
               </button>
             </div>
           {/if}
