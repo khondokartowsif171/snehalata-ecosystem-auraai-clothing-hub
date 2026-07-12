@@ -3,7 +3,6 @@
   import { fade, scale } from 'svelte/transition';
   import { Zap, LayoutDashboard, Users, ShieldCheck, Cpu, Network, Package, Plus, Layout, Palette, Eye, Globe, BarChart3, Sparkles, Loader2, Upload, Pencil } from '@lucide/svelte';
   import ProductCard from '$lib/components/ProductCard.svelte';
-  import { analyzeWebsiteProducts } from '$lib/geminiService';
   import { getVendors, getProductsByVendor, syncWithNeuralGrid } from '$lib/mockData';
   import { fileToCompressedDataURL } from '$lib/imageUpload';
   import type { Vendor } from '$lib/types';
@@ -259,36 +258,6 @@
     localStorage.removeItem('aura_active_vendor_email');
     localStorage.removeItem('aura_vendor_token');
     window.location.reload();
-  }
-
-  async function syncWithNeuralProxy() {
-    const urlToAnalyze = externalUrlInput || vendor?.website_url;
-    if (!urlToAnalyze || !vendor) return;
-    if (vendor.status !== 'APPROVED') {
-      alert('Compliance Check Required: Your neural node is currently pending SNEHALATA CEO approval.');
-      return;
-    }
-    isAnalysisMode = true;
-    analysisProgress = 10;
-    try {
-      analysisProgress = 30;
-      const response = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlToAnalyze })
-      });
-      if (!response.ok) throw new Error('Neural proxy failed.');
-      const data = await response.json();
-      analysisProgress = 60;
-      const productsResult = await analyzeWebsiteProducts(data.content);
-      analysisProgress = 90;
-      detectedItems = productsResult || [];
-      analysisProgress = 100;
-    } catch (error: any) {
-      console.error("Neural Sync Error:", error);
-      alert(`Analysis failed: ${error.message}`);
-      isAnalysisMode = false;
-    }
   }
 
   async function vendorPost(body: any) {
@@ -811,10 +780,11 @@
                   />
                 </div>
                 <button
-                  onclick={syncWithNeuralProxy}
-                  class="px-10 py-5 bg-white text-black rounded-3xl font-black uppercase text-[11px] tracking-[0.2em] hover:bg-aura-green hover:text-white transition-all shadow-xl"
+                  onclick={handleSync}
+                  disabled={isSyncing}
+                  class="px-10 py-5 bg-white text-black rounded-3xl font-black uppercase text-[11px] tracking-[0.2em] hover:bg-aura-green hover:text-white transition-all shadow-xl disabled:opacity-50"
                 >
-                  Initiate Scrape
+                  {isSyncing ? 'Syncing…' : 'Sync from Website'}
                 </button>
               </div>
 
