@@ -13,8 +13,15 @@
   import { loadReviewAgg } from '$lib/reviews';
   import { ECO_CATEGORIES } from '$lib/categories';
   import { LayoutGrid } from '@lucide/svelte';
+  import { page } from '$app/stores';
 
   let { children } = $props();
+
+  // The admin Control Center (/admin, /admin-login) is a full-screen dashboard with its OWN
+  // header + search + nav — so hide all the customer-facing chrome (the "Neural search" top
+  // nav, footer, mobile bottom-nav, category sheet, floating cart, shopping-assistant chat)
+  // there. It was showing on top of the CEO command center = out of place / wasted space.
+  const isAdmin = $derived($page.url.pathname.startsWith('/admin'));
 
   // Aura chat is a floating, non-critical widget → load it AFTER the page is
   // interactive so it never blocks initial hydration (was slowing the HUB page).
@@ -93,16 +100,18 @@
 </div>
 
 <div class="min-h-screen flex flex-col">
-  <Nav />
-  <main class="flex-1 pb-16 lg:pb-0">
+  {#if !isAdmin}<Nav />{/if}
+  <main class="flex-1 {isAdmin ? '' : 'pb-16 lg:pb-0'}">
     {@render children()}
   </main>
-  <Footer />
+  {#if !isAdmin}<Footer />{/if}
 </div>
 
-<BottomNav />
-<CategorySheet />
-<FloatingCart />
-{#if ChatAssistant}
-  <ChatAssistant />
+{#if !isAdmin}
+  <BottomNav />
+  <CategorySheet />
+  <FloatingCart />
+  {#if ChatAssistant}
+    <ChatAssistant />
+  {/if}
 {/if}
