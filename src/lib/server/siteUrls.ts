@@ -47,7 +47,9 @@ export async function buildSiteUrls(): Promise<SiteUrl[]> {
     urls.push({ loc: `${SITE_URL}/store/${encodeURIComponent(v.slug)}`, priority: '0.8', changefreq: 'weekly' });
   }
   for (const p of products) {
-    urls.push({ loc: `${SITE_URL}/try-on/${p.id}`, priority: '0.6', changefreq: 'weekly' });
+    // Per-product indexable detail page (Product rich results) — highest product priority.
+    urls.push({ loc: `${SITE_URL}/product/${p.id}`, priority: '0.7', changefreq: 'weekly' });
+    urls.push({ loc: `${SITE_URL}/try-on/${p.id}`, priority: '0.5', changefreq: 'weekly' });
   }
   return urls;
 }

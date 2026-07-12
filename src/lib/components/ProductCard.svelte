@@ -206,7 +206,7 @@
   <div class="space-y-3 px-1 sm:px-2">
     <div class="flex justify-between items-start gap-2">
       <div class="flex-1 min-w-0">
-        <h3 class="text-[13px] sm:text-[15px] font-bold text-white group-hover:text-[#10b981] transition-colors truncate mb-0.5">{product.name}</h3>
+        <a href={`/product/${product.id}`} class="block" title={product.name}><h3 class="text-[13px] sm:text-[15px] font-bold text-white group-hover:text-[#10b981] transition-colors truncate mb-0.5">{product.name}</h3></a>
         {#if vendor}
           <a href={`/store/${vendor.slug}`} class="text-[8px] text-gray-600 uppercase tracking-widest block hover:text-white transition-colors">{vendor.store_name}</a>
         {/if}

@@ -13,7 +13,58 @@
   const products = $derived(
     data.products?.length ? data.products : vendor ? getProductsByVendor(Number(vendor.id)) : []
   );
+
+  const SITE = 'https://www.snehalata.com';
+  const storeUrl = $derived(vendor ? `${SITE}/store/${vendor.slug}` : SITE);
+  const abs = (u: string) => (u?.startsWith('http') ? u : `${SITE}${u || ''}`);
+  // Store + product ItemList + breadcrumb structured data → store pages eligible for rich results.
+  const jsonLd = $derived(
+    vendor
+      ? JSON.stringify([
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Store',
+            name: vendor.store_name,
+            description: vendor.description || `${vendor.store_name} — Snehalata-তে যাচাই করা আসল পণ্য।`,
+            url: storeUrl,
+            ...(vendor.district ? { address: { '@type': 'PostalAddress', addressLocality: vendor.district, addressCountry: 'BD' } } : {})
+          },
+          {
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            numberOfItems: products.length,
+            itemListElement: products.slice(0, 30).map((p: any, i: number) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              url: `${SITE}/product/${p.id}`,
+              name: p.name
+            }))
+          },
+          {
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'নীড় · Home', item: `${SITE}/` },
+              { '@type': 'ListItem', position: 2, name: vendor.store_name, item: storeUrl }
+            ]
+          }
+        ])
+      : ''
+  );
 </script>
+
+<svelte:head>
+  {#if vendor}
+    <title>{vendor.store_name} — Snehalata-তে অফিসিয়াল স্টোর</title>
+    <meta name="description" content={vendor.description || `${vendor.store_name}-এর যাচাই করা আসল পণ্য Snehalata-তে — ন্যায্য দাম, ক্যাশ অন ডেলিভারি।`} />
+    <link rel="canonical" href={storeUrl} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={`${vendor.store_name} — Snehalata`} />
+    <meta property="og:url" content={storeUrl} />
+    {#if products[0]?.imageUrl}<meta property="og:image" content={abs(products[0].imageUrl)} />{/if}
+    {@html `<script type="application/ld+json">${jsonLd}<\/script>`}
+  {/if}
+</svelte:head>
 
 {#if !vendor}
   <div class="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#080b09]">
