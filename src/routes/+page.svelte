@@ -628,11 +628,9 @@
                 <Icon size={26} strokeWidth={1.6} />
               </div>
             {/if}
-            {#if hasProducts(cat)}
-              <div class="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[#0a0f0d]/85 border border-aura-green/50" title="Neural Verified">
-                <ShieldCheck size={9} class="text-aura-green" /><span class="text-[7px] font-black text-aura-green tracking-tight">Verified</span>
-              </div>
-            {/if}
+            <div class="absolute top-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[#0a0f0d]/85 border border-aura-green/50" title="Neural Verified">
+              <ShieldCheck size={9} class="text-aura-green" /><span class="text-[7px] font-black text-aura-green tracking-tight">Verified</span>
+            </div>
           </div>
           <div class="text-[11.5px] font-semibold text-[#dde5e1] mt-2 leading-tight">{cat.name}</div>
         </button>

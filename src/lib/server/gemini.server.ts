@@ -160,7 +160,9 @@ Rules:
 - Use ONLY vendor/product IDS that appear in the CONTEXT below — never invent an id. You MAY create brand-new vendors by NAME (create_vendor, or move_products.to_new_vendor_name) and CHAIN steps in order (e.g. create a store → move products into it → approve).
 - There is no size COLUMN, but a product's size is usually the trailing number in its NAME (e.g. "Tops VINTAGE - 40" = size 40). So you CAN honour size preferences: set move_products.prefer_sizes to a priority list (e.g. [40, 38]) — the server parses the size from each name, groups variants by their base name, and keeps ONE product per item matching the first available preferred size. If a name has no trailing size, size prefs just don't apply to it; note that in "reply" instead of refusing the whole command.
 - Prefer the smallest set of actions, in execution order. Put a short, clear Bengali+English confirmation in "reply". Only return actions:[] if truly nothing is doable.
+- YOU KNOW THE WHOLE LIVE CATALOG: the CONTEXT lists EVERY vendor with its product counts AND the category breakdown of its products ("cats: Undergarments 8, Others 2"). For any READ / "show me / kotota / which categories / status" question (e.g. "which categories does vendor X have", "how many products", "vendor talika"), ANSWER DIRECTLY in "reply" from the CONTEXT with actions:[] — never say you lack a command. Use "list_products" ONLY when the owner wants the actual item-by-item NAME list.
 Supported action "type" values (set only the fields relevant to that type):
+- "list_products": return the actual product list (names, category, price, live/pending) — a READ-ONLY query, runs instantly without confirmation. fields: vendor_id (number) OR category (string) OR product_ids (number[]); pending_only (bool, optional). Use for "show/list vendor X's products", "Undergarments category-r product gulo dekhao".
 - "approve_pending": publish pending (awaiting-review) products live. fields: vendor_id (number) OR product_ids (number[]) OR all (bool = every pending product).
 - "reject_pending": permanently delete pending products. same fields as approve_pending.
 - "import_url": scrape a website and create/fill a store from it. fields: url (string, required), store_name (string, optional), deep (bool = use headless render).
@@ -170,12 +172,15 @@ Supported action "type" values (set only the fields relevant to that type):
 - "edit_product": change one product. fields: product_id (number, required) + any of price (number), name (string), category (string), is_active (bool), vendor_id (number = reassign to another store).
 - "set_price": set price on products. fields: (product_ids (number[]) OR vendor_id (number)) + price (number) OR above_market (bool = a little above the category average).
 - "set_vendor_status": fields: vendor_id (number, required), status ("approved" | "blocked" | "pending").
+- "recategorize_products": change the storefront CATEGORY of products (this is what actually moves them between category tiles — the storefront filters by product category, not vendor tag). fields: vendor_id (number = all of that vendor's products) OR product_ids (number[]); category (string, required — a real storefront category like "Undergarments"/"Saree"/"Panjabi"); set_vendor_tag (bool, default true = also set the vendor's category label). USE THIS for "move/put vendor X into category Y (store + all products)".
 
 EFFICIENCY: emit the SMALLEST plan. For "move one-per-item by size to a (new) store and approve", use exactly ONE move_products action with prefer_sizes — NEVER one action per product, and keep actions ≤ 4.
 Example — command "Daamcom-er pending theke size 40 (na thakle 38), sob vinno item er ekta, 'Sneha Fasion' name e notun store banaye move kore approve koro" (Daamcom = #23 in CONTEXT) →
 {"reply":"Daamcom-এর pending থেকে প্রতি item-এর size-40 (নাহলে 38) 'Sneha Fasion' নতুন স্টোরে move + approve করছি।","actions":[{"type":"move_products","from_vendor_id":23,"pending_only":true,"prefer_sizes":[40,38],"to_new_vendor_name":"Sneha Fasion","approve":true}]}
+Example — command "Femis-Fahi-Heven-er product talika dekhao" (Femis-Fahi-Heven = #18) → {"reply":"Femis-Fahi-Heven-এর product তালিকা নিচে দিলাম।","actions":[{"type":"list_products","vendor_id":18}]}
+Example — command "Undergarments category-te kotogula product ache?" → answer FROM CONTEXT (sum the "Undergarments" counts across vendors) → {"reply":"Undergarments category-তে মোট N টি product আছে (…vendor-wise…)।","actions":[]}
 
-CONTEXT — live vendors (id · name · pending · total) and note:
+CONTEXT — the LIVE CATALOG (every vendor with product counts + category breakdown):
 ${context}`;
   const res = await withRetry(() =>
     ai.models.generateContent({
@@ -213,6 +218,7 @@ ${context}`;
                   pending_only: { type: Type.BOOLEAN },
                   dedupe_by_name: { type: Type.BOOLEAN },
                   prefer_sizes: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                  set_vendor_tag: { type: Type.BOOLEAN },
                   approve: { type: Type.BOOLEAN }
                 },
                 required: ['type']

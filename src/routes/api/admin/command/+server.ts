@@ -15,20 +15,52 @@ function assertAdmin(request: Request) {
   if (!env.ADMIN_PASSWORD || pass !== env.ADMIN_PASSWORD) throw error(401, 'Unauthorized — admin only');
 }
 
-// Compact CONTEXT for the planner: every vendor + its pending/total product counts.
+// LIVE CATALOG context for the planner: every vendor + its category breakdown + live/pending
+// counts. This is what lets Aura ANSWER "which categories / how many products" without a mutation.
 async function buildContext(a: any) {
-  const { data: vendors } = await a.from('vendors').select('id,store_name,status').order('id');
-  const { data: prods } = await a.from('products').select('id,vendor_id,is_active');
+  const { data: vendors } = await a.from('vendors').select('id,store_name,status,category').order('id');
+  const { data: prods } = await a.from('products').select('id,vendor_id,is_active,category');
   const pending: Record<number, number> = {};
   const total: Record<number, number> = {};
+  const active: Record<number, number> = {};
+  const catByVendor: Record<number, Record<string, number>> = {};
   for (const p of prods || []) {
     const v = Number(p.vendor_id) || 0;
     total[v] = (total[v] || 0) + 1;
     if (p.is_active === false) pending[v] = (pending[v] || 0) + 1;
+    else active[v] = (active[v] || 0) + 1;
+    const c = p.category || 'Others';
+    (catByVendor[v] ||= {})[c] = (catByVendor[v][c] || 0) + 1;
   }
   const totalPending = Object.values(pending).reduce((s, n) => s + n, 0);
-  const lines = (vendors || []).map((v: any) => `#${v.id} · ${v.store_name} · pending ${pending[v.id] || 0} · total ${total[v.id] || 0} · ${v.status}`);
-  return { text: `Total pending across all vendors: ${totalPending}\n${lines.join('\n')}`, vendors: vendors || [], pending, total };
+  const lines = (vendors || []).map((v: any) => {
+    const hist = catByVendor[v.id] ? Object.entries(catByVendor[v.id]).map(([c, n]) => `${c} ${n}`).join(', ') : '—';
+    return `#${v.id} · ${v.store_name} · tag:${v.category || '—'} · total ${total[v.id] || 0} (live ${active[v.id] || 0} · pending ${pending[v.id] || 0}) · ${v.status} · cats: ${hist}`;
+  });
+  const header = `LIVE CATALOG — vendors: ${(vendors || []).length} · products: ${(prods || []).length} · pending: ${totalPending}`;
+  return { text: `${header}\n${lines.join('\n')}`, vendors: vendors || [], pending, total, active, catByVendor };
+}
+
+// Snap a free-form category name onto a real storefront category (the storefront filters by
+// product.category, so this must be one of the known ones or the tile can't show it).
+const KNOWN_CATS = ['Saree', 'Panjabi', 'Three-Piece', 'Borka', 'Shirt', 'T-Shirt', 'Pant', 'Baby', 'Cosmetics', 'Undergarments', 'Gadgets', 'Market', 'Others'];
+function snapCategory(raw: string): string {
+  const n = String(raw || '').toLowerCase().trim();
+  const exact = KNOWN_CATS.find((c) => c.toLowerCase() === n);
+  if (exact) return exact;
+  if (n.includes('under') || n.includes('lingerie') || n.includes('night') || n.includes('bra') || n.includes('panty')) return 'Undergarments';
+  if (n.includes('saree') || n.includes('sari')) return 'Saree';
+  if (n.includes('panjabi') || n.includes('punjabi') || n.includes('kurta')) return 'Panjabi';
+  if (n.includes('three') || n.includes('salwar') || n.includes('kameez')) return 'Three-Piece';
+  if (n.includes('borka') || n.includes('hijab') || n.includes('niqab') || n.includes('abaya')) return 'Borka';
+  if (n.includes('t-shirt') || n.includes('tshirt') || n.includes('tee')) return 'T-Shirt';
+  if (n.includes('shirt')) return 'Shirt';
+  if (n.includes('pant') || n.includes('trouser') || n.includes('jean')) return 'Pant';
+  if (n.includes('baby') || n.includes('kid') || n.includes('child')) return 'Baby';
+  if (n.includes('cosmetic') || n.includes('makeup') || n.includes('beauty')) return 'Cosmetics';
+  if (n.includes('gadget') || n.includes('watch') || n.includes('electronic')) return 'Gadgets';
+  if (n.includes('market')) return 'Market';
+  return raw ? String(raw).replace(/\b\w/g, (m) => m.toUpperCase()) : 'Others';
 }
 
 const vname = (ctx: any, id: number) => ctx.vendors.find((v: any) => v.id === id)?.store_name || `vendor #${id}`;
@@ -62,6 +94,8 @@ function previewAction(act: any, ctx: any): string {
     case 'edit_product': return `Edit product #${act.product_id}` + [act.price != null ? ` · price ৳${act.price}` : '', act.name ? ` · name "${act.name}"` : '', act.category ? ` · category ${act.category}` : '', act.is_active != null ? ` · ${act.is_active ? 'live' : 'pending'}` : ''].join('');
     case 'set_price': return `Set price ${act.above_market ? 'ABOVE market avg (+15%)' : `৳${act.price}`} on ` + (act.vendor_id ? `all products of ${vname(ctx, act.vendor_id)}` : `${(act.product_ids || []).length} products`);
     case 'set_vendor_status': return `Set ${vname(ctx, act.vendor_id)} status → ${act.status}`;
+    case 'recategorize_products': return `Recategorize ${act.vendor_id ? `all products of ${vname(ctx, act.vendor_id)}` : `${(act.product_ids || []).length} products`} → ${snapCategory(act.category)}`;
+    case 'list_products': return `List ${act.pending_only ? 'pending ' : ''}products of ${act.vendor_id ? vname(ctx, act.vendor_id) : act.category ? `category ${snapCategory(act.category)}` : `${(act.product_ids || []).length} ids`}`;
     case 'create_vendor': return `Create store "${act.store_name}"${act.category ? ` (${act.category})` : ''}`;
     case 'move_products': {
       const tgt = act.to_new_vendor_name ? `new store "${act.to_new_vendor_name}"` : vname(ctx, act.to_vendor_id);
@@ -73,8 +107,19 @@ function previewAction(act: any, ctx: any): string {
   }
 }
 
-async function execAction(a: any, act: any, event: any): Promise<{ ok: boolean; affected?: number; note: string }> {
+async function execAction(a: any, act: any, event: any): Promise<{ ok: boolean; affected?: number; note: string; products?: any[] }> {
   switch (act.type) {
+    case 'list_products': {
+      let sel = a.from('products').select('id,name,category,price,is_active').order('id');
+      if (Array.isArray(act.product_ids) && act.product_ids.length) sel = sel.in('id', act.product_ids);
+      else if (act.vendor_id) sel = sel.eq('vendor_id', act.vendor_id);
+      else if (act.category) sel = sel.ilike('category', snapCategory(act.category));
+      else return { ok: false, note: 'no target (need vendor_id, category, or product_ids)' };
+      if (act.pending_only) sel = sel.eq('is_active', false);
+      const { data, error: e } = await sel.limit(200);
+      if (e) throw new Error(e.message);
+      return { ok: true, affected: (data || []).length, note: `${(data || []).length} products`, products: data || [] };
+    }
     case 'approve_pending': {
       let q = a.from('products').update({ is_active: true }).eq('is_active', false);
       if (act.vendor_id) q = q.eq('vendor_id', act.vendor_id);
@@ -196,6 +241,21 @@ async function execAction(a: any, act: any, event: any): Promise<{ ok: boolean; 
       if (e) throw new Error(e.message);
       return { ok: true, affected: 1, note: `vendor #${act.vendor_id} → ${st}` };
     }
+    case 'recategorize_products': {
+      const cat = snapCategory(act.category);
+      if (!cat) return { ok: false, note: 'no category' };
+      let q = a.from('products').update({ category: cat });
+      if (Array.isArray(act.product_ids) && act.product_ids.length) q = q.in('id', act.product_ids);
+      else if (act.vendor_id) q = q.eq('vendor_id', act.vendor_id);
+      else return { ok: false, note: 'no target (need vendor_id or product_ids)' };
+      const { data, error: e } = await q.select('id');
+      if (e) throw new Error(e.message);
+      // Also set the vendor's category tag (id-form) unless explicitly disabled.
+      if (act.set_vendor_tag !== false && act.vendor_id) {
+        try { await a.from('vendors').update({ category: cat.toLowerCase() }).eq('id', act.vendor_id); } catch { /* tag is cosmetic */ }
+      }
+      return { ok: true, affected: (data || []).length, note: `recategorized ${(data || []).length} products → ${cat}` };
+    }
     default:
       return { ok: false, note: `unknown action type: ${act.type}` };
   }
@@ -238,6 +298,26 @@ export const POST: RequestHandler = async (event) => {
       actions: []
     });
   }
-  const actions = (plan.actions || []).map((act: any) => ({ ...act, preview: previewAction(act, ctx) }));
+  // Read-only queries (list_products) need no confirmation — run them immediately and fold the
+  // result into the reply so the owner just sees the answer.
+  const rawActions = plan.actions || [];
+  const READ_ONLY = new Set(['list_products']);
+  if (rawActions.length && rawActions.every((x: any) => READ_ONLY.has(x.type))) {
+    const chunks: string[] = [];
+    for (const act of rawActions) {
+      try {
+        const r = await execAction(a, act, event);
+        const list = (r.products || [])
+          .map((p: any) => `• #${p.id} ${p.name} · ${p.category || '—'} · ৳${p.price} · ${p.is_active === false ? 'pending' : 'live'}`)
+          .join('\n');
+        chunks.push(list || '(কোনো product পাওয়া যায়নি)');
+      } catch (e: any) {
+        chunks.push(`(query failed: ${e?.message || 'error'})`);
+      }
+    }
+    return json({ ok: true, reply: `${plan.reply}\n\n${chunks.join('\n\n')}`, actions: [] });
+  }
+
+  const actions = rawActions.map((act: any) => ({ ...act, preview: previewAction(act, ctx) }));
   return json({ ok: true, reply: plan.reply, actions });
 };
