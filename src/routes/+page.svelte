@@ -200,6 +200,7 @@
   // real, tappable, responsive chips (each navigates to its feature). Replaces the 4 boxes.
   const HERO_FEATURES = [
     { icon: ShieldCheck, label: 'Neural Verified', href: '#trust-banner' },
+    { icon: Sparkles, label: 'কীভাবে ব্যবহার', href: '/guide' },
     { icon: Shirt, label: 'AR Try-On', href: '/studio' },
     { icon: Search, label: 'Neural Search', action: 'search' },
     { icon: Globe, label: 'Live Market', href: '#collection' },
