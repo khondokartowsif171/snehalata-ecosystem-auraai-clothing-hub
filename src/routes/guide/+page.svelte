@@ -1,8 +1,5 @@
 <script lang="ts">
-  import { Search, Shirt, ShoppingBag, Truck, Wallet, Store, UploadCloud, PackageCheck, BadgeCheck, Sparkles, PlayCircle, ArrowRight, ShieldCheck } from '@lucide/svelte';
-
-  // Owner drops a real walkthrough video here later (YouTube embed id or a /videos/*.mp4 path).
-  const VIDEO_URL = ''; // e.g. 'https://www.youtube.com/embed/XXXX'
+  import { Search, Shirt, ShoppingBag, Truck, Wallet, Store, UploadCloud, PackageCheck, BadgeCheck, Sparkles, ArrowRight, ShieldCheck } from '@lucide/svelte';
 
   const shopperSteps = [
     { icon: Search, title: 'খুঁজুন — লিখে বা ছবি দিয়ে', body: 'নাম লিখে অথবা যেকোনো পোশাকের ছবি তুলে Neural Search-এ দিন — Aura মিলিয়ে পণ্য খুঁজে দেয়।' },
@@ -38,19 +35,24 @@
       <p class="text-gray-400 mt-3 max-w-2xl mx-auto text-sm leading-relaxed">বাংলাদেশের প্রথম AI-নিয়ন্ত্রিত মার্কেটপ্লেস — ক্রেতা ও বিক্রেতা দুজনের জন্যই সহজ। নিচে ধাপে-ধাপে দেখানো হলো।</p>
     </div>
 
-    <!-- Video slot -->
-    <div class="mb-14 rounded-[2rem] overflow-hidden border border-white/10 bg-white/[0.02]">
-      {#if VIDEO_URL}
-        <div class="aspect-video">
-          <iframe class="w-full h-full" src={VIDEO_URL} title="Snehalata ভিডিও গাইড" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        </div>
-      {:else}
-        <div class="aspect-video flex flex-col items-center justify-center gap-3 text-center px-6 bg-[linear-gradient(160deg,#101a15,#080b09)]">
-          <PlayCircle size={48} class="text-aura-green/70" />
-          <p class="text-white font-bold text-sm">ভিডিও গাইড শীঘ্রই আসছে 🎬</p>
-          <p class="text-gray-500 text-xs max-w-md">নিচের ধাপগুলো দেখে এখনই শুরু করতে পারেন — ক্রেতা হিসেবে কিনুন, অথবা বিক্রেতা হিসেবে যোগ দিন।</p>
-        </div>
-      {/if}
+    <!-- Video walkthrough (self-hosted; only downloads on play) -->
+    <div class="mb-10 rounded-[2rem] overflow-hidden border border-aura-green/20 bg-black shadow-2xl shadow-aura-green/5">
+      <video class="w-full aspect-video bg-black" controls preload="none" playsinline poster="/guide/infographic-1.jpg">
+        <source src="/videos/snehalata-intro.mp4" type="video/mp4" />
+        আপনার ব্রাউজার ভিডিও সাপোর্ট করে না।
+      </video>
+    </div>
+
+    <!-- Branded showcase — Snehalata-র signature visuals (AR Try-On · সাধ্য Mode · Neural Verified) -->
+    <div class="mb-14">
+      <p class="text-center text-[11px] uppercase tracking-widest font-black text-gray-500 mb-4">এক নজরে Snehalata</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {#each ['infographic-1.jpg', 'infographic-2.jpg', 'infographic-3.jpg'] as img}
+          <a href={`/guide/${img}`} target="_blank" rel="noreferrer" class="block rounded-2xl overflow-hidden border border-white/10 hover:border-aura-green/40 transition-all bg-white/[0.02]">
+            <img src={`/guide/${img}`} alt="Snehalata" loading="lazy" class="w-full h-auto" />
+          </a>
+        {/each}
+      </div>
     </div>
 
     <!-- Shoppers track -->
