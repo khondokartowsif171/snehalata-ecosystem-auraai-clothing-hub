@@ -102,9 +102,10 @@ function pickImage(img: any, origin: string): string {
 }
 
 // ── 1. Shopify: /products.json returns the WHOLE catalog, cleanly, in a few calls ──
-async function fromShopify(origin: string): Promise<ImportedProduct[]> {
+async function fromShopify(origin: string, offset = 0): Promise<ImportedProduct[]> {
   const out: ImportedProduct[] = [];
-  for (let page = 1; page <= 4; page++) {
+  const startPage = Math.floor(offset / 250) + 1; // continue where a prior sync left off
+  for (let page = startPage; page < startPage + 4; page++) {
     const data = await httpGet(`${origin}/products.json?limit=250&page=${page}`, 10000);
     const list = data && Array.isArray(data.products) ? data.products : null;
     if (!list || !list.length) break;
@@ -127,11 +128,12 @@ async function fromShopify(origin: string): Promise<ImportedProduct[]> {
 // ── 1b. WooCommerce Store API (public, no auth) — the full catalog as JSON on any WP/Woo
 // store. A huge share of BD shops run WooCommerce, which has NO /products.json (that's
 // Shopify) but DOES expose /wp-json/wc/store/v1/products. Prices are in minor units. ──
-async function fromWooStore(origin: string): Promise<ImportedProduct[]> {
+async function fromWooStore(origin: string, offset = 0): Promise<ImportedProduct[]> {
   const out: ImportedProduct[] = [];
+  const startPage = Math.floor(offset / 100) + 1; // continue where a prior sync left off
   for (const base of [`${origin}/wp-json/wc/store/v1/products`, `${origin}/wp-json/wc/store/products`]) {
-    for (let page = 1; page <= 4; page++) {
-      const data = await httpGet(`${base}?per_page=100&page=${page}`, 10000);
+    for (let page = startPage; page < startPage + 4; page++) {
+      const data = await httpGet(`${base}?per_page=100&page=${page}`, 12000);
       const list = Array.isArray(data) ? data : null;
       if (!list || !list.length) break;
       for (const p of list) {
@@ -206,7 +208,12 @@ function jsonLdProducts(html: string, origin: string): ImportedProduct[] {
 // Per product page: JSON-LD Product first; if none, fall back to OpenGraph tags (og:title/
 // og:image/price). The og fallback is what lets custom + SPA stores that only server-inject
 // per-product meta (no JSON-LD) still import — the common case for Laravel/React BD shops.
-async function fromSitemap(origin: string, cap = 48): Promise<ImportedProduct[]> {
+async function fromSitemap(
+  origin: string,
+  cap = 48,
+  offset = 0,
+  meta: { total?: number } = {}
+): Promise<ImportedProduct[]> {
   const seen = new Set<string>();
   const productUrls: string[] = [];
   const sitemaps = [
@@ -217,8 +224,10 @@ async function fromSitemap(origin: string, cap = 48): Promise<ImportedProduct[]>
   ];
   const queue = [...sitemaps];
   const tried = new Set<string>();
+  const COLLECT_MAX = 5000; // gather the WHOLE product-URL list (cheap: a few XML fetches) so
+  // repeated syncs can walk the catalog via `offset` — but only fetch `cap` product PAGES.
   let fetched = 0;
-  while (queue.length && productUrls.length < cap && fetched < 10) {
+  while (queue.length && productUrls.length < COLLECT_MAX && fetched < 10) {
     const sm = queue.shift()!;
     if (tried.has(sm)) continue;
     tried.add(sm);
@@ -240,11 +249,14 @@ async function fromSitemap(origin: string, cap = 48): Promise<ImportedProduct[]>
       }
     }
   }
+  meta.total = productUrls.length; // whole catalog size, for "X of N imported so far"
+  // Only the CURRENT batch [offset, offset+cap) is fetched → each sync advances by `cap`.
+  const pageUrls = productUrls.slice(offset, offset + cap);
   const out: ImportedProduct[] = [];
   // Small concurrency so we stay within the serverless budget.
   const batch = 6;
-  for (let i = 0; i < productUrls.length && i < cap; i += batch) {
-    const slice = productUrls.slice(i, i + batch);
+  for (let i = 0; i < pageUrls.length; i += batch) {
+    const slice = pageUrls.slice(i, i + batch);
     const pages = await Promise.all(slice.map((u) => httpGet(u, 8000).then((h) => [u, h] as const)));
     for (const [u, html] of pages) {
       if (typeof html !== 'string') continue;
@@ -369,11 +381,21 @@ export type ImportDiag = {
   jsonld: number; // homepage JSON-LD
   sitemap: number; // JSON-LD + OpenGraph swept from product pages
   ai: number;
+  offset: number; // how many products were skipped (already imported) — the batch cursor
+  sitemapTotal?: number; // total product URLs the sitemap exposes (whole-catalog size)
   note?: string;
 };
 
-/** Import a vendor's whole catalog from their website — structured first, AI last. */
-export async function scrapeProducts(url: string, diag: Partial<ImportDiag> = {}): Promise<ImportedProduct[]> {
+/**
+ * Import a vendor's whole catalog from their website — structured first, AI last.
+ * `offset` skips products already imported so repeated syncs walk the WHOLE catalog in
+ * batches (paired with the name-dedupe in syncVendor → never a duplicate, always advances).
+ */
+export async function scrapeProducts(
+  url: string,
+  diag: Partial<ImportDiag> = {},
+  offset = 0
+): Promise<ImportedProduct[]> {
   const target = normalizeUrl(url);
   let origin = target;
   try {
@@ -381,17 +403,17 @@ export async function scrapeProducts(url: string, diag: Partial<ImportDiag> = {}
   } catch {
     /* keep as-is */
   }
-  Object.assign(diag, { origin, engine: 'none', shopify: 0, woo: 0, jsonld: 0, sitemap: 0, ai: 0 });
+  Object.assign(diag, { origin, engine: 'none', shopify: 0, woo: 0, jsonld: 0, sitemap: 0, ai: 0, offset });
 
   // 1 / 1b. Structured whole-catalog feeds — try the given host AND its www. counterpart
   // (a store may only serve a valid cert / feed on one of them).
   for (const o of originVariants(origin)) {
-    const shopify = await fromShopify(o);
+    const shopify = await fromShopify(o, offset);
     if (shopify.length) {
       diag.shopify = shopify.length; diag.engine = 'shopify'; diag.origin = o;
       return dedupeByName(shopify);
     }
-    const woo = await fromWooStore(o);
+    const woo = await fromWooStore(o, offset);
     if (woo.length) {
       diag.woo = woo.length; diag.engine = 'woo'; diag.origin = o;
       return dedupeByName(woo);
@@ -400,12 +422,15 @@ export async function scrapeProducts(url: string, diag: Partial<ImportDiag> = {}
 
   const html = await httpGet(target, 12000);
   if (typeof html === 'string') {
-    // 2. JSON-LD on the landing page.
-    const onPage = jsonLdProducts(html, origin);
+    // 2. JSON-LD on the landing page — only on the first batch (offset 0), else it re-adds
+    //    the same homepage items every sync (harmless via dedupe, but wastes batch slots).
+    const onPage = offset === 0 ? jsonLdProducts(html, origin) : [];
     // 3. Sitemap sweep — FULL catalog via JSON-LD OR OpenGraph on each product page.
-    const swept = await fromSitemap(origin);
+    const smMeta: { total?: number } = {};
+    const swept = await fromSitemap(origin, 48, offset, smMeta);
     diag.jsonld = onPage.length;
     diag.sitemap = swept.length;
+    diag.sitemapTotal = smMeta.total;
     const structured = dedupeByName([...onPage, ...swept]);
     if (structured.length) {
       // Recover images for products whose JSON-LD omitted them (fetch their page → og:image).
@@ -468,10 +493,13 @@ export async function syncVendor(
 ) {
   if (!vendor.website_url) return { imported: 0, found: 0, note: 'no website configured' };
 
-  const diagnostics: Partial<ImportDiag> = {};
-  const items = await scrapeProducts(vendor.website_url, diagnostics);
   const { data: existing } = await a.from('products').select('name').eq('vendor_id', vendor.id);
   const have = new Set((existing || []).map((p: any) => String(p.name || '').toLowerCase().trim()));
+
+  const diagnostics: Partial<ImportDiag> = {};
+  // Skip the products already imported for this vendor so each sync fetches the NEXT batch
+  // (the name-dedupe below still guarantees zero duplicates even if the cursor drifts).
+  const items = await scrapeProducts(vendor.website_url, diagnostics, have.size);
 
   const rows = items
     .filter((it) => it?.name && (it.confidence === undefined || Number(it.confidence) >= 40))

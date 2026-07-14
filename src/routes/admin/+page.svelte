@@ -86,8 +86,14 @@
       const d = await importCall({ action: 'sync' });
       const dg = d.diagnostics || {};
       const engine = dg.engine && dg.engine !== 'none' ? ` · engine: ${dg.engine}` : '';
+      const total = dg.sitemapTotal, off = dg.offset ?? 0, imp = d.imported ?? 0;
+      const batchInfo = total ? ` · ${Math.min(off + imp, total)}/${total} পর্যন্ত (বাকি ~${Math.max(0, total - off - imp)})` : '';
+      const more = total && off + imp < total ? ' আবার "Sync" চাপলে পরের ব্যাচ আসবে।' : '';
       if ((d.found ?? 0) > 0) {
-        importMsg = `Sync: ${d.imported ?? 0} নতুন পণ্য (সাইটে ${d.found ?? 0}টি পাওয়া গেছে${engine}) → Review ট্যাবে approve করুন।`;
+        importMsg = `Sync: ${imp} নতুন পণ্য (এই ব্যাচে ${d.found}টি${engine})${batchInfo} → Review ট্যাবে approve করুন।${more}`;
+      } else if (off > 0) {
+        // Advanced past the end — everything already imported. No duplicates, just done.
+        importMsg = `Sync: নতুন কিছু নেই — এই স্টোরের সব পণ্য (${off}টি) আগেই import হয়ে গেছে ✓${total ? ` (মোট ${total})` : ''}।`;
       } else {
         // Honest "why 0" — show which strategies ran + the reason, not a silent blank.
         const counts = `Shopify ${dg.shopify ?? 0} · Woo ${dg.woo ?? 0} · JSON-LD ${dg.jsonld ?? 0} · sitemap ${dg.sitemap ?? 0} · AI ${dg.ai ?? 0}`;
