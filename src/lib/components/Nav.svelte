@@ -131,6 +131,9 @@
       <a href="/tracking" class="hidden xl:flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 hover:text-aura-green transition-all">
         <PackageSearch size={12} /> Track Order
       </a>
+      <a href="/bazar" class="hidden xl:flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 hover:text-aura-green transition-all">
+        <Store size={12} /> বাজার
+      </a>
       <a href="/sell" class="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-aura-gold/10 border border-aura-gold/25 text-[9px] font-black uppercase tracking-[0.25em] text-aura-gold hover:bg-aura-gold/20 transition-colors">
         <Store size={12} /> Sell on Snehalata
       </a>
@@ -164,6 +167,9 @@
         </a>
         <a href="/guide" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider text-gray-400 hover:text-white">
           <Sparkles size={16} /> কীভাবে ব্যবহার করবেন
+        </a>
+        <a href="/bazar" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider text-gray-400 hover:text-white">
+          <Store size={16} /> সরাসরি বাজার
         </a>
         <a href="/orders" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider"
            class:text-aura-green={$page.url.pathname.startsWith('/orders')} class:text-gray-400={!$page.url.pathname.startsWith('/orders')}>

@@ -8,16 +8,22 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async () => {
   try {
     const a = adminClient();
-    const [pRes, vRes, cRes] = await Promise.all([
-      // NEVER select the `embedding` vector here — it's server-only (semantic search)
-      // and shipping it made this endpoint multi-second. Storefront columns only.
-      a
-        .from('products')
-        .select('id,name,price,category,image_url,description,stock_quantity,vendor_id,is_active,created_at,moderation_score')
-        .or('is_active.is.null,is_active.eq.true'),
+    const cols = 'id,name,price,category,image_url,description,stock_quantity,vendor_id,is_active,created_at,moderation_score';
+    // The curated storefront shows ONLY verified-vendor products — C2C "সরাসরি বাজার"
+    // listings live at /api/bazar and must never leak in here (keeps the trust tiers
+    // distinct). Fall back to the unfiltered query if listing_type isn't migrated, so
+    // the storefront never dies over a missing column.
+    const fetchProducts = async () => {
+      let r = await a.from('products').select(cols).or('is_active.is.null,is_active.eq.true').or('listing_type.is.null,listing_type.eq.VENDOR');
+      if (r.error) r = await a.from('products').select(cols).or('is_active.is.null,is_active.eq.true');
+      return r.data || [];
+    };
+    const [pData, vRes, cRes] = await Promise.all([
+      fetchProducts(),
       a.from('vendors').select('*'),
       a.from('categories').select('*')
     ]);
+    const pRes = { data: pData };
     // THE real weight: a few rows stored the whole image as a base64 `data:` URL (one was
     // 200 KB by itself) → the catalog ballooned to ~1 MB. Never ship base64 to the client —
     // null it so productImg() shows the branded fallback. Also trim description to a snippet.

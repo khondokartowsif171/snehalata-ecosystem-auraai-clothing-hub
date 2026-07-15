@@ -39,18 +39,21 @@ export const POST: RequestHandler = async ({ request }) => {
   const { error: ae } = await a.auth.admin.createUser({ email: authEmail, password, email_confirm: true });
   if (ae && !/already|registered|exists/i.test(ae.message)) throw error(400, ae.message);
 
+  // Individual C2C sellers (স্নেহলতা সরাসরি বাজার) are auto-approved so they can post
+  // immediately — trust is enforced per-LISTING (Aura moderation) instead, not per-seller.
+  const vendorType = b.vendorType || 'SUBDOMAIN';
   const row: Record<string, any> = {
     store_name: shopName,
     owner_name: (b.ownerName || '').trim(),
     email: authEmail,
     phone,
-    status: 'pending',
+    status: vendorType === 'INDIVIDUAL' ? 'approved' : 'pending',
     description: b.description || '',
     website_url: b.websiteUrl || '',
     district: b.district || '',
     area: b.area || '',
     category: b.category || null,
-    vendor_type: b.vendorType || 'SUBDOMAIN'
+    vendor_type: vendorType
   };
   let { data: vend, error: ve } = await a.from('vendors').insert(row).select().single();
   // If the `phone` column doesn't exist yet, retry without it so registration never hard-breaks.
