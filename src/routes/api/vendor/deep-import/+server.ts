@@ -43,7 +43,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   let items: { name: string; price: number; imageUrl: string }[];
   try {
-    items = await renderAndExtract(vendor.website_url);
+    items = (await renderAndExtract(vendor.website_url)).items;
   } catch (e: any) {
     // Headless not available (e.g. bundle/size limit) or the site blocked rendering.
     throw error(503, 'Deep render is unavailable right now — the standard Import still works for most sites.');

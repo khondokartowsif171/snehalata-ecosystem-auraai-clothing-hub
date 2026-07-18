@@ -72,7 +72,7 @@ export const POST: RequestHandler = async ({ request }) => {
     if (!vendor.website_url) throw error(400, 'Set a website URL for this vendor first');
     let items: { name: string; price: number; imageUrl: string }[];
     try {
-      items = await renderAndExtract(vendor.website_url);
+      items = (await renderAndExtract(vendor.website_url)).items;
     } catch {
       throw error(503, 'Deep render is unavailable right now — the standard Sync works for most sites.');
     }

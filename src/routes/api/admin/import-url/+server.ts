@@ -79,17 +79,21 @@ async function insertItems(a: ReturnType<typeof adminClient>, vendor: Vendor, it
 // vision read the products off the page's images. This is what makes a feedless SPA import.
 async function deepWithVision(url: string): Promise<SocialItem[]> {
   let rendered: { name: string; price: number; imageUrl: string }[] = [];
+  let media: { imageUrl: string; caption: string }[] = [];
   try {
-    rendered = await renderAndExtract(url);
+    const r = await renderAndExtract(url);
+    rendered = r.items;
+    media = r.media;
   } catch {
     rendered = [];
+    media = [];
   }
   const base: SocialItem[] = rendered.map((r) => ({ name: r.name, price: r.price, imageUrl: r.imageUrl }));
   const good = base.filter((b) => b.name && b.name.length > 2 && b.price > 0);
   if (good.length >= 3) return base;
-  // Heuristic weak → vision reads the rendered images (name + price-printed-on-image + category).
-  const media = base.slice(0, 12).map((r) => ({ imageUrl: r.imageUrl, caption: r.name }));
-  const vis = await extractProductsFromMedia(media);
+  // Heuristic weak → hand the page's candidate product images to Gemini vision, which reads the
+  // name + the price printed on / implied by each image. This is what makes a feedless site import.
+  const vis = await extractProductsFromMedia(media.slice(0, 12));
   const seen = new Set<string>();
   const out: SocialItem[] = [];
   for (const it of [...vis, ...base]) {

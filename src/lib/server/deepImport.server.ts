@@ -2,9 +2,12 @@
 // (with a lazy-load scroll), and heuristically pull product tiles (name + price + image)
 // from the LIVE DOM. Shared by /api/vendor/deep-import and /api/admin/vendor-import.
 // Heavy + slow → callers must set `config.maxDuration` + memory.
-export async function renderAndExtract(
-  targetUrl: string
-): Promise<{ name: string; price: number; imageUrl: string }[]> {
+export type RenderResult = {
+  items: { name: string; price: number; imageUrl: string }[];
+  media: { imageUrl: string; caption: string }[];
+};
+
+export async function renderAndExtract(targetUrl: string): Promise<RenderResult> {
   const chromium = (await import('@sparticuz/chromium')).default;
   const puppeteer = await import('puppeteer-core');
 
@@ -36,10 +39,12 @@ export async function renderAndExtract(
     });
     await new Promise((r) => setTimeout(r, 1200));
 
-    const items = await page.evaluate(() => {
+    const result = await page.evaluate(() => {
       const priceRe = /(?:৳|Tk\.?|BDT|Rs\.?|\$)\s?[\d,]{2,}|[\d,]{3,}\s?(?:৳|টাকা|tk)/i;
       const out: { name: string; price: number; imageUrl: string }[] = [];
+      const media: { imageUrl: string; caption: string }[] = [];
       const seen = new Set<string>();
+      const mSeen = new Set<string>();
       const imgs = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
       for (const img of imgs) {
         const src = img.currentSrc || img.src || '';
@@ -47,6 +52,22 @@ export async function renderAndExtract(
         if (/logo|icon|sprite|banner|favicon|placeholder|avatar/i.test(src)) continue;
         const w = img.naturalWidth || img.width || 0;
         if (w && w < 90) continue; // skip tiny UI images
+
+        // Candidate media for the AI-vision fallback — EVERY sizable content image + its nearby
+        // text, whether or not a price sits near it (vision reads the price off the image itself).
+        if (media.length < 30 && !mSeen.has(src)) {
+          let ctx = (img.alt || '').trim();
+          let p: HTMLElement | null = img;
+          for (let i = 0; i < 4 && p; i++) {
+            p = p.parentElement;
+            const t = p ? (p.innerText || '').trim() : '';
+            if (t && t.length > ctx.length) ctx = t;
+            if (ctx.length > 40) break;
+          }
+          mSeen.add(src);
+          media.push({ imageUrl: src, caption: ctx.replace(/\s+/g, ' ').slice(0, 300) });
+        }
+
         let el: HTMLElement | null = img;
         let container: HTMLElement | null = null;
         let priceText = '';
@@ -75,9 +96,9 @@ export async function renderAndExtract(
         out.push({ name: name.slice(0, 200), price, imageUrl: src });
         if (out.length >= 80) break;
       }
-      return out;
+      return { items: out, media };
     });
-    return items;
+    return result;
   } finally {
     await browser.close().catch(() => {});
   }
