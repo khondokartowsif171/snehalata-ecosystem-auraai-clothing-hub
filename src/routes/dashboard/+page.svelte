@@ -203,6 +203,35 @@
     }
   }
 
+  let isFbSyncing = $state(false);
+  // Consume the session handed by the FB callback via the URL hash (never hits the server/logs).
+  function consumeFbHash() {
+    if (typeof location === 'undefined' || !location.hash || location.hash.length < 2) return;
+    const h = new URLSearchParams(location.hash.slice(1));
+    const t = h.get('fbt');
+    if (t) {
+      localStorage.setItem('aura_vendor_token', t);
+      if (h.get('fbid')) localStorage.setItem('aura_active_vendor_id', h.get('fbid') as string);
+      if (h.get('fbe')) localStorage.setItem('aura_active_vendor_email', h.get('fbe') as string);
+      history.replaceState(null, '', location.pathname);
+    }
+  }
+  async function handleFbSync() {
+    isFbSyncing = true;
+    try {
+      const res = await fetch('/api/vendor/fb/sync', { method: 'POST', headers: { Authorization: `Bearer ${vendorToken()}` } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      await syncWithNeuralGrid();
+      loadVendorData();
+      alert(data.imported ? `Facebook থেকে ${data.imported}টি নতুন পণ্য এল — রিভিউ শেষে ক্যাটালগে দেখাবে।` : (data.note || 'নতুন কিছু পাওয়া যায়নি।'));
+    } catch (err: any) {
+      alert('Facebook sync failed: ' + (err?.message || 'unknown error'));
+    } finally {
+      isFbSyncing = false;
+    }
+  }
+
   async function handleChangePassword() {
     if (!newPass || newPass.length < 6) { pwMsg = 'Password must be at least 6 characters'; return; }
     pwLoading = true; pwMsg = null;
@@ -230,7 +259,15 @@
     const activeEmail = browser ? localStorage.getItem('aura_active_vendor_email') : null;
     const allVendors = getVendors();
     let currentVendor: any = null;
-    if (activeId) currentVendor = allVendors.find((v: any) => String(v.id) === activeId);
+    // Authoritative: resolve straight from the session token — covers new / FB-connected stores not
+    // yet in the CDN catalog, and carries fb_page_id for the "Sync from Facebook" button.
+    if (browser && vendorToken()) {
+      try {
+        const meRes = await fetch('/api/vendor/me', { headers: { Authorization: `Bearer ${vendorToken()}` } });
+        if (meRes.ok) { const md = await meRes.json(); if (md?.vendor) currentVendor = md.vendor; }
+      } catch { /* fall back to the catalog lookup below */ }
+    }
+    if (!currentVendor && activeId) currentVendor = allVendors.find((v: any) => String(v.id) === activeId);
     if (!currentVendor && activeEmail) currentVendor = allVendors.find((v: any) => v.email === activeEmail);
     if (currentVendor) {
       vendor = currentVendor;
@@ -251,7 +288,7 @@
   }
 
   $effect(() => {
-    if (browser) loadVendorData();
+    if (browser) { consumeFbHash(); loadVendorData(); }
   });
 
   function handleLogout() {
@@ -426,6 +463,10 @@
             </button>
             <a href="/onboarding" class="w-full py-5 bg-white/5 border border-white/10 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] hover:bg-white hover:text-black transition-all flex items-center justify-center">
               Register New Business Node
+            </a>
+            <a href="/api/vendor/fb/connect" class="w-full py-5 bg-[#1877F2] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>
+              Facebook দিয়ে যুক্ত হন
             </a>
           </div>
         {:else}
@@ -631,6 +672,17 @@
             >
               <Sparkles size={18} class={isDeepImporting ? 'animate-spin' : ''} />
               <span>{isDeepImporting ? 'Rendering…' : 'Deep Import'}</span>
+            </button>
+          {/if}
+          {#if vendor.fb_page_id}
+            <button
+              onclick={handleFbSync}
+              disabled={isFbSyncing}
+              title="Import products from your connected Facebook page"
+              class="group px-8 py-5 bg-[#1877F2]/10 border border-[#1877F2]/40 text-white rounded-3xl font-black uppercase text-[11px] tracking-widest flex items-center gap-3 hover:border-[#1877F2] transition-all disabled:opacity-50"
+            >
+              {#if isFbSyncing}<Loader2 size={18} class="animate-spin" />{:else}<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>{/if}
+              <span>{isFbSyncing ? 'Syncing…' : 'Sync from Facebook'}</span>
             </button>
           {/if}
           <label
