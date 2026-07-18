@@ -47,12 +47,15 @@ type Vendor = { id: number; store_name: string; website_url?: string | null };
 // everything pending for Review. Used by the deep/social/auto-fallback branches.
 async function insertItems(a: ReturnType<typeof adminClient>, vendor: Vendor, items: SocialItem[]): Promise<number> {
   if (!items.length) return 0;
+  // Normalised dedup key (alphanumeric prefix) — AI extractors name the same product a bit
+  // differently across runs, so an exact-name match let duplicates through.
+  const norm = (s: unknown) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 32);
   const { data: existing } = await a.from('products').select('name').eq('vendor_id', vendor.id);
-  const have = new Set((existing || []).map((p: any) => String(p.name || '').toLowerCase().trim()));
+  const have = new Set((existing || []).map((p: any) => norm(p.name)));
   const seen = new Set<string>();
   const rows = items
     .filter((it) => {
-      const k = String(it.name || '').toLowerCase().trim();
+      const k = norm(it.name);
       if (!k || k.length < 2 || have.has(k) || seen.has(k)) return false;
       seen.add(k);
       return true;

@@ -36,12 +36,15 @@ export const POST: RequestHandler = async ({ request }) => {
   const found = items.length;
 
   // Dedupe against what the store already has, snap categories, everything pending for Review.
+  // Normalised key (alphanumeric prefix) — vision names the same product slightly differently across
+  // syncs ("…Mask EX [Glow]" vs "…Mask Ex"), so an exact-name match let duplicates through.
+  const norm = (s: unknown) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 32);
   const { data: existing } = await a.from('products').select('name').eq('vendor_id', vend.id);
-  const have = new Set((existing || []).map((p: any) => String(p.name || '').toLowerCase().trim()));
+  const have = new Set((existing || []).map((p: any) => norm(p.name)));
   const seen = new Set<string>();
   const rows = items
     .filter((it) => {
-      const k = String(it.name || '').toLowerCase().trim();
+      const k = norm(it.name);
       if (!k || k.length < 2 || have.has(k) || seen.has(k)) return false;
       seen.add(k);
       return true;
