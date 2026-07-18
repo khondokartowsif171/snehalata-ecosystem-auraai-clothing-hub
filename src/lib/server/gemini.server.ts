@@ -376,19 +376,23 @@ export const generateAuraSpeech = async (text: string) => {
 export const analyzeProductMedia = async (
     items: { imageUrl: string; caption?: string }[]
 ): Promise<{ name: string; price: number; category: string; imageUrl: string; description: string; confidence: number }[]> => {
-    const out: { name: string; price: number; category: string; imageUrl: string; description: string; confidence: number }[] = [];
+    type Row = { name: string; price: number; category: string; imageUrl: string; description: string; confidence: number };
     const CATS = 'Saree, Panjabi, Three-Piece, Borka, Shirt, T-Shirt, Pant, Baby, Cosmetics, Undergarments, Gadgets, Others';
-    for (const it of items.slice(0, 12)) {
-        if (!it.imageUrl) continue;
+    const cap = items.slice(0, 10);
+
+    // One image → one product. gemini-flash-latest reads a price printed on the photo far better than
+    // 3-flash-preview (verified: it pulled ৳990 off a Dabo post image the older model returned 0 for).
+    async function one(it: { imageUrl: string; caption?: string }): Promise<Row | null> {
+        if (!it.imageUrl) return null;
         let inline: { data: string; mimeType: string };
-        try { inline = await imageToInline(it.imageUrl); } catch { continue; }
+        try { inline = await imageToInline(it.imageUrl); } catch { return null; }
         try {
             const response = await withTimeout(ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-flash-latest',
                 contents: {
                     parts: [
                         { inlineData: { data: inline.data, mimeType: inline.mimeType } },
-                        { text: `This image is from an online seller (clothing/cosmetics/lifestyle). Nearby caption: "${(it.caption || '').slice(0, 500)}". Extract the ONE product being sold: name; price as a BDT number (read it from the caption OR from text printed on the image; 0 if truly none); category (exactly one of: ${CATS}); a short description; and confidence 0-100 that this is a real sellable product (give 0 for a logo, banner, collage, or a photo of a person with no clear product). Reply as JSON.` }
+                        { text: `Product photo from an online seller (clothing/cosmetics/lifestyle). Nearby caption: "${(it.caption || '').slice(0, 500)}". Identify the ONE product being sold. IMPORTANT: look CAREFULLY at the IMAGE ITSELF for a price printed on it (৳ / Tk / BDT / টাকা) — BD sellers often overlay the price on the photo; if you see one, use it. Extract: name; price as a BDT number (from the image OR the caption; 0 ONLY if there is genuinely no price anywhere); category (exactly one of: ${CATS}); a short description; and confidence 0-100 that this is a real sellable product (0 for a logo, banner, collage, or person-only photo). Reply as JSON.` }
                     ]
                 },
                 config: {
@@ -405,19 +409,29 @@ export const analyzeProductMedia = async (
                         required: ['name', 'confidence']
                     }
                 }
-            }), 15000);
+            }), 12000);
             const p = response && JSON.parse((response as any).text || '{}');
             if (p && p.name && Number(p.confidence ?? 0) >= 55) {
-                out.push({
+                return {
                     name: String(p.name).slice(0, 200),
                     price: Number(p.price) || 0,
                     category: String(p.category || 'Others'),
                     imageUrl: it.imageUrl,
                     description: String(p.description || '').slice(0, 300),
                     confidence: Number(p.confidence) || 0
-                });
+                };
             }
         } catch { /* skip this image — a booster, never fatal */ }
+        return null;
+    }
+
+    // Run in small parallel batches so a page of 10 images finishes in ~10-15s, not ~2 min
+    // sequentially (that was blowing the 60s function budget → the "Sync from Facebook" 504).
+    const out: Row[] = [];
+    const CONCURRENCY = 5;
+    for (let i = 0; i < cap.length; i += CONCURRENCY) {
+        const results = await Promise.all(cap.slice(i, i + CONCURRENCY).map(one));
+        for (const r of results) if (r) out.push(r);
     }
     return out;
 };
