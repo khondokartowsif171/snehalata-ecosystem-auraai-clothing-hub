@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { withTimeout } from '$lib/seedCatalog';
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || '',
@@ -368,11 +369,64 @@ export const generateAuraSpeech = async (text: string) => {
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 };
 
+// Vision extractor — the "any website imports" fallback. When a page has NO structured feed
+// (feedless SPA, image-only shop, a Facebook/Instagram post), we still have product IMAGES +
+// nearby TEXT. Gemini looks at each image, reads the caption AND any price printed on the image,
+// and returns a clean product. Capped (vision is heavy) and confidence-gated (drops logos/banners).
+export const analyzeProductMedia = async (
+    items: { imageUrl: string; caption?: string }[]
+): Promise<{ name: string; price: number; category: string; imageUrl: string; description: string; confidence: number }[]> => {
+    const out: { name: string; price: number; category: string; imageUrl: string; description: string; confidence: number }[] = [];
+    const CATS = 'Saree, Panjabi, Three-Piece, Borka, Shirt, T-Shirt, Pant, Baby, Cosmetics, Undergarments, Gadgets, Others';
+    for (const it of items.slice(0, 12)) {
+        if (!it.imageUrl) continue;
+        let inline: { data: string; mimeType: string };
+        try { inline = await imageToInline(it.imageUrl); } catch { continue; }
+        try {
+            const response = await withTimeout(ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: {
+                    parts: [
+                        { inlineData: { data: inline.data, mimeType: inline.mimeType } },
+                        { text: `This image is from an online seller (clothing/cosmetics/lifestyle). Nearby caption: "${(it.caption || '').slice(0, 500)}". Extract the ONE product being sold: name; price as a BDT number (read it from the caption OR from text printed on the image; 0 if truly none); category (exactly one of: ${CATS}); a short description; and confidence 0-100 that this is a real sellable product (give 0 for a logo, banner, collage, or a photo of a person with no clear product). Reply as JSON.` }
+                    ]
+                },
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: { type: Type.STRING },
+                            price: { type: Type.NUMBER },
+                            category: { type: Type.STRING },
+                            description: { type: Type.STRING },
+                            confidence: { type: Type.NUMBER }
+                        },
+                        required: ['name', 'confidence']
+                    }
+                }
+            }), 15000);
+            const p = response && JSON.parse((response as any).text || '{}');
+            if (p && p.name && Number(p.confidence ?? 0) >= 55) {
+                out.push({
+                    name: String(p.name).slice(0, 200),
+                    price: Number(p.price) || 0,
+                    category: String(p.category || 'Others'),
+                    imageUrl: it.imageUrl,
+                    description: String(p.description || '').slice(0, 300),
+                    confidence: Number(p.confidence) || 0
+                });
+            }
+        } catch { /* skip this image — a booster, never fatal */ }
+    }
+    return out;
+};
+
 export const analyzeWebsiteProducts = async (htmlContent: string) => {
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Analyze the following webpage content and extract a list of products. For each product, find: name, price (convert to BDT numbers if possible), image URL (if present), and a confidence score (0-100) based on how sure you are it's a product.
-        
+
         CONTENT:
         ${htmlContent.substring(0, 30000)}`,
         config: {

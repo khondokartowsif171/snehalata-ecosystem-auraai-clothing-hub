@@ -462,7 +462,7 @@ export async function scrapeProducts(
 // Snap a scraped/free-form source category onto a real storefront category so imported
 // products (once approved) never land in an orphan category the home rail can't show.
 // Mirrors the dashboard snapCategory; "Others" is the safe catch-all.
-function snapImportedCategory(raw?: string): string {
+export function snapImportedCategory(raw?: string): string {
   const n = String(raw || '').toLowerCase().trim();
   if (!n) return 'Others';
   const KNOWN = ['saree', 'panjabi', 'three-piece', 'borka', 'shirt', 't-shirt', 'pant', 'baby', 'cosmetics', 'undergarments', 'gadgets', 'others'];
