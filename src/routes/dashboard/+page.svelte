@@ -444,11 +444,11 @@
 
       <div class="text-center mb-12">
         <h2 class="text-4xl sm:text-5xl font-serif font-black mb-6 italic tracking-tighter uppercase">
-          Portal Entrance <br />
-          <span class="text-aura-green text-5xl sm:text-6xl">Locked</span>
+          স্বাগতম <br />
+          <span class="text-aura-green text-5xl sm:text-6xl">পার্টনার</span>
         </h2>
         <p class="text-gray-400 leading-relaxed font-medium max-w-sm mx-auto">
-          Authenticate your business identity to access the <span class="text-white">Aura Management Grid</span>. Manage products, analyze neural traffic, and scale your artisan brand.
+          লগইন করে আপনার দোকান, অর্ডার আর সবকিছু সহজে ম্যানেজ করুন। স্নেহলতা পরিবারে আপনাকে আবার পেয়ে আমরা খুশি! 💚
         </p>
       </div>
 
@@ -459,10 +459,10 @@
               onclick={() => showLogin = true}
               class="w-full py-5 bg-aura-green text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] shadow-[0_20px_50px_rgba(16,185,129,0.3)] border border-white/20 hover:scale-[1.02] active:scale-95 transition-all"
             >
-              Sign In to Dashboard
+              লগইন করুন
             </button>
             <a href="/onboarding" class="w-full py-5 bg-white/5 border border-white/10 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] hover:bg-white hover:text-black transition-all flex items-center justify-center">
-              Register New Business Node
+              পার্টনার হিসেবে যুক্ত হোন
             </a>
             <a href="/api/vendor/fb/connect" class="w-full py-5 bg-[#1877F2] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>
@@ -478,7 +478,7 @@
                 </div>
               {/if}
               <div class="space-y-2">
-                <label class="text-[10px] text-gray-500 font-black uppercase tracking-widest px-1">Neural Email</label>
+                <label class="text-[10px] text-gray-500 font-black uppercase tracking-widest px-1">মোবাইল নম্বর বা ইমেইল</label>
                 <div class="relative group">
                   <div class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-aura-green transition-colors">
                     <Users size={18} />
@@ -494,7 +494,7 @@
                 </div>
               </div>
               <div class="space-y-2">
-                <label class="text-[10px] text-gray-500 font-black uppercase tracking-widest px-1">Access Key (Password)</label>
+                <label class="text-[10px] text-gray-500 font-black uppercase tracking-widest px-1">পাসওয়ার্ড</label>
                 <div class="relative group">
                   <div class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-aura-green transition-colors">
                     <ShieldCheck size={18} />
@@ -711,7 +711,7 @@
             <div class="flex items-center justify-between mb-8 px-2">
               <div class="flex items-center gap-4">
                 <BarChart3 class="text-aura-green" size={28} />
-                <h2 class="text-3xl font-serif font-black italic">Incoming Orders</h2>
+                <h2 class="text-3xl font-serif font-black italic">নতুন অর্ডার</h2>
               </div>
               <span class="text-[10px] font-black uppercase tracking-widest text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10">{vendorOrders.length} items</span>
             </div>
@@ -910,7 +910,7 @@
               {:else}
                 <div class="col-span-full py-40 border-4 border-dashed border-white/5 rounded-[4rem] text-center flex flex-col items-center">
                   <Package size={64} class="text-gray-800 mb-6" />
-                  <h3 class="text-2xl font-serif italic text-gray-600">Your Neural Vault is Empty</h3>
+                  <h3 class="text-2xl font-serif italic text-gray-600">আপনার দোকান এখনো খালি — চলুন প্রথম পণ্যটা যোগ করি!</h3>
                   <p class="text-gray-700 text-sm mt-2 max-w-xs mx-auto">Populate your digital presence by importing artifacts or adding manual entries.</p>
                 </div>
               {/if}

@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { adminClient } from '$lib/server/vendorSync';
+import { sendVendorPending } from '$lib/server/email.server';
 import type { RequestHandler } from './$types';
 
 // Public vendor self-registration. Creates a Supabase Auth login + a vendor row
@@ -10,12 +11,13 @@ export const POST: RequestHandler = async ({ request }) => {
   const phone = String(b.phone || '').replace(/[^0-9]/g, '');
   const emailIn = (b.email || '').trim().toLowerCase();
   const password = b.password || '';
-  // Phone is the primary identity in BD (email optional). Login works with either.
-  if (!shopName || !phone || !password) throw error(400, 'Shop name, phone and password are required');
+  // Phone + email are BOTH required now — email is how we notify the vendor of approval.
+  if (!shopName || !phone || !password || !emailIn) throw error(400, 'দোকানের নাম, মোবাইল নম্বর, ইমেইল ও পাসওয়ার্ড — সবগুলো দিন');
   if (phone.length < 11) throw error(400, 'একটি সঠিক মোবাইল নম্বর দিন (১১ ডিজিট)');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailIn)) throw error(400, 'একটি সঠিক ইমেইল ঠিকানা দিন');
   if (String(password).length < 6) throw error(400, 'Password must be at least 6 characters');
-  // Auth account is email-keyed in Supabase → use the real email, or a synthetic one from the phone.
-  const authEmail = emailIn || `v${phone}@snehalata.local`;
+  // Auth account is email-keyed in Supabase.
+  const authEmail = emailIn;
 
   const a = adminClient();
 
@@ -62,6 +64,9 @@ export const POST: RequestHandler = async ({ request }) => {
     ({ data: vend, error: ve } = await a.from('vendors').insert(rowNoPhone).select().single());
   }
   if (ve) throw error(500, ve.message);
+
+  // Tell the vendor we received their application (approval mail follows after admin review).
+  await sendVendorPending(authEmail, shopName).catch(() => {});
 
   return json({ ok: true, vendor: vend });
 };

@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { adminClient } from '$lib/server/vendorSync';
+import { sendVendorApproved } from '$lib/server/email.server';
 import type { RequestHandler } from './$types';
 
 // Admin vendor management: approve / block (PATCH status) and remove (DELETE).
@@ -79,8 +80,20 @@ export const PATCH: RequestHandler = async ({ request, url }) => {
   }
   if (Object.keys(update).length === 0) throw error(400, 'no fields to update');
 
+  // Detect the pending→approved transition so we email the vendor exactly once.
+  let notifyApproved = false;
+  if (update.status === 'approved') {
+    const { data: cur } = await adminClient().from('vendors').select('status').eq('id', id).single();
+    notifyApproved = (cur?.status || '').toLowerCase() !== 'approved';
+  }
+
   const { data, error: e } = await adminClient().from('vendors').update(update).eq('id', id).select().single();
   if (e) throw error(500, e.message);
+
+  // "🎉 approved" email — only on the transition, and only to a real email address.
+  if (notifyApproved && data?.email) {
+    await sendVendorApproved(data.email, data.store_name || 'আপনার দোকান', data.email).catch(() => {});
+  }
 
   // The storefront filters by PRODUCT category, not the vendor tag — so setting a vendor's
   // category ALSO moves every one of its products to that category tile. This is what makes
