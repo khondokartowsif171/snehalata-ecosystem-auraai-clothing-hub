@@ -92,15 +92,15 @@ function stepRow(): string {
 /** Sent right after a vendor registers. */
 export function sendVendorPending(to: string, shopName: string): Promise<boolean> {
   const inner = `
-    <p style="margin:0 0 14px;">প্রিয় পার্টনার,</p>
+    <p style="margin:0 0 14px;">প্রিয় <b>${esc(shopName)}</b> টিম,</p>
     <p style="margin:0 0 14px;">স্নেহলতা <b>Aura Neural Grid</b>-এ স্বাগতম — বাংলাদেশের প্রথম <b>Neural Verified Commerce Ecosystem</b>।</p>
-    <p style="margin:0 0 6px;">আপনার Storefront <b>${esc(shopName)}</b> এখন verification-এ — Aura AI নিজেই যাচাই করছে। ✅ হলেই সঙ্গে সঙ্গে এই ইমেইলে জানাব।</p>
+    <p style="margin:0 0 6px;">আপনার Storefront এখন <b>verification</b>-এ — Aura AI নিজেই যাচাই করছে। ✅ হলেই আপনি হয়ে যাবেন আমাদের <b>Neural Verified পার্টনার</b>, আর দোকান খুলে যাবে সারা দেশের জন্য — সঙ্গে সঙ্গে এই ইমেইলে জানাব।</p>
     ${stepRow()}
     <p style="margin:18px 0 0;color:${MUTE};">— টিম স্নেহলতা</p>`;
   return send(
     to,
     'স্নেহলতা Neural Grid — আপনার Storefront verify হচ্ছে ⚡',
-    shell({ preheader: 'Aura AI আপনার Storefront যাচাই করছে — শীঘ্রই LIVE ⚡', badge: '⚡', title: 'স্বাগতম, পার্টনার', subtitle: 'বাংলাদেশের প্রথম Neural Verified Commerce Ecosystem', inner })
+    shell({ preheader: 'Aura AI আপনার Storefront যাচাই করছে — verify হলেই পার্টনার ⚡', badge: '⚡', title: 'স্বাগতম, স্নেহলতায়', subtitle: 'বাংলাদেশের প্রথম Neural Verified Commerce Ecosystem', inner })
   );
 }
 
