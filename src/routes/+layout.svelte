@@ -11,6 +11,7 @@
   import { priceStats, buildPriceStats } from '$lib/fairPrice';
   import { siteCategories, featuredConfig } from '$lib/ui';
   import { loadReviewAgg } from '$lib/reviews';
+  import { enableWebMcp } from '$lib/webmcp.client';
   import { ECO_CATEGORIES } from '$lib/categories';
   import { LayoutGrid } from '@lucide/svelte';
   import { page } from '$app/stores';
@@ -34,6 +35,9 @@
 
   $effect(() => {
     if (!browser) return;
+    // WebMCP — register Snehalata's tools so in-browser AI agents (Gemini in Chrome, etc.)
+    // can search + buy on Snehalata directly. No-op in browsers without the trial.
+    enableWebMcp();
     // Fair-Price Truth stats — rebuilt from the live catalog (global, all pages).
     const refreshStats = () => priceStats.set(buildPriceStats(getProducts()));
     refreshStats();
