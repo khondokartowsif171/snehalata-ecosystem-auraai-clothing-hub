@@ -12,8 +12,12 @@ export const reroute: Reroute = ({ url }) => {
   const host = url.hostname.toLowerCase();
   if (!host.endsWith('.' + ROOT)) return; // apex / www / preview / localhost → normal routing
   const sub = host.slice(0, -(ROOT.length + 1));
-  // Aura Control Center gateway: admin.snehalata.com/ → /admin (deeper paths route normally).
-  if (sub === 'admin') return url.pathname === '/' ? '/admin' : undefined;
+  // Aura Control Center gateway: admin.snehalata.com
+  if (sub === 'admin') {
+    if (url.pathname === '/' || url.pathname === '/admin') return '/admin';
+    if (url.pathname === '/login' || url.pathname === '/admin-login') return '/admin-login';
+    return undefined;
+  }
   if (!sub || sub.includes('.') || RESERVED.has(sub)) return;
   // Only the shop root maps to the storefront; deeper paths (cart, product, etc.) route normally.
   if (url.pathname === '/') return `/store/${sub}`;
