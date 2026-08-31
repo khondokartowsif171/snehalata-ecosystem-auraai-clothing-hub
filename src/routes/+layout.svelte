@@ -27,7 +27,7 @@
   // header + search + nav — so hide all the customer-facing chrome (the "Neural search" top
   // nav, footer, mobile bottom-nav, category sheet, floating cart, shopping-assistant chat)
   // there. It was showing on top of the CEO command center = out of place / wasted space.
-  const isAdmin = $derived($page.url.pathname.startsWith('/admin'));
+  const isAdmin = $derived($page.url.pathname.startsWith('/admin') || $page.url.pathname === '/login' || $page.url.pathname.startsWith('/admin-login') || $page.url.pathname.startsWith('/ceo-dashboard'));
 
   // Aura chat is a floating, non-critical widget → load it AFTER the page is
   // interactive so it never blocks initial hydration (was slowing the HUB page).
