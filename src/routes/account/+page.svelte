@@ -67,9 +67,30 @@
     }
   }
 
+  function loadCustomerOrders(cust: CustomerProfile | null) {
+    if (!cust || !browser) {
+      orders = [];
+      return;
+    }
+    let myOrderIds: string[] = [];
+    try {
+      const raw = localStorage.getItem('aura_my_orders');
+      if (raw) myOrderIds = JSON.parse(raw);
+    } catch {}
+
+    const all = getOrders();
+    orders = all.filter(o => {
+      if (myOrderIds.includes(o.id)) return true;
+      if (o.customerName && cust.name && o.customerName.trim().toLowerCase() === cust.name.trim().toLowerCase()) return true;
+      if ((o as any).customerEmail && (o as any).customerEmail.toLowerCase() === cust.email.toLowerCase()) return true;
+      if ((o as any).customerPhone && cust.phone && (o as any).customerPhone === cust.phone) return true;
+      return false;
+    });
+  }
+
   onMount(() => {
     customer = getStoredCustomer();
-    orders = getOrders();
+    loadCustomerOrders(customer);
 
     if (customer) {
       syncAddressFields(customer);
@@ -77,6 +98,7 @@
 
     const unsubscribe = initCustomerAuthListener((profile) => {
       customer = profile;
+      loadCustomerOrders(profile);
       if (profile) {
         syncAddressFields(profile);
       }
@@ -112,7 +134,7 @@
       }
     }
 
-    const handleOrders = () => { orders = getOrders(); };
+    const handleOrders = () => { loadCustomerOrders(customer); };
     window.addEventListener('orderUpdated', handleOrders);
     window.addEventListener('cartUpdated', handleOrders);
 

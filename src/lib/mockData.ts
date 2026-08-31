@@ -106,23 +106,7 @@ export const syncWithNeuralGrid = async (): Promise<void> => {
   return syncInFlight;
 };
 
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: "ORD-5001",
-    customerName: "Rahim Ahmed",
-    totalAmount: 17700,
-    items: [INITIAL_PRODUCTS[0], INITIAL_PRODUCTS[2]],
-    currentStatus: "SHIPPED",
-    estimatedDelivery: "24 Feb, 2025",
-    timeline: [
-      { status: 'PLACED', label: 'অর্ডার প্লেস করা হয়েছে', timestamp: '20 Feb, 10:00 AM', completed: true, description: "Customer placed order via Aura Hub" },
-      { status: 'CONFIRMED', label: 'ভেন্ডর কনফার্মেশন', timestamp: '20 Feb, 10:30 AM', completed: true, description: "Royal Bengal Looms accepted the request" },
-      { status: 'QUALITY_CHECK', label: 'Aura কোয়ালিটি চেক', timestamp: '21 Feb, 02:15 PM', completed: true, description: "Passes Aura Governance Standards (Thread Count: 100)" },
-      { status: 'SHIPPED', label: 'শিপিং-এর জন্য প্রস্তুত', timestamp: '22 Feb, 09:00 AM', completed: true, description: "Handed over to Pathao Courier" },
-      { status: 'DELIVERED', label: 'ডেলিভারি সম্পন্ন', timestamp: '-', completed: false, description: "Estimated: 24 Feb" },
-    ]
-  }
-];
+const INITIAL_ORDERS: Order[] = [];
 
 export const MOCK_STATS: EcosystemStats = { ...SEED_STATS };
 
