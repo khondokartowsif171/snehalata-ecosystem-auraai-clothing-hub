@@ -38,6 +38,35 @@
   let addrDivision = $state('Dhaka');
   let addrPhone = $state('');
 
+  function parseJwt(token: string) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch {
+      return null;
+    }
+  }
+
+  function handleGoogleCredentialResponse(response: any) {
+    if (response?.credential) {
+      const payload = parseJwt(response.credential);
+      if (payload?.email) {
+        const profile = directGoogleLogin(payload.email, payload.name || payload.given_name, payload.picture);
+        customer = profile;
+        syncAddressFields(profile);
+        oauthError = '';
+        loading = false;
+      }
+    }
+  }
+
   onMount(() => {
     customer = getStoredCustomer();
     orders = getOrders();
@@ -52,6 +81,36 @@
         syncAddressFields(profile);
       }
     });
+
+    // Load Google Identity Services script
+    if (browser && !(window as any).google?.accounts?.id) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        try {
+          (window as any).google?.accounts?.id?.initialize({
+            client_id: '1090833690992-8qnnl2b2hscgdnt6f4avr4hg8rl9gldj.apps.googleusercontent.com',
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+        } catch (e) {
+          console.warn('GSI init error:', e);
+        }
+      };
+      document.head.appendChild(script);
+    } else if (browser && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google?.accounts?.id?.initialize({
+          client_id: '1090833690992-8qnnl2b2hscgdnt6f4avr4hg8rl9gldj.apps.googleusercontent.com',
+          callback: handleGoogleCredentialResponse,
+        });
+      } catch (e) {
+        console.warn('GSI init error:', e);
+      }
+    }
 
     const handleOrders = () => { orders = getOrders(); };
     window.addEventListener('orderUpdated', handleOrders);
@@ -75,6 +134,28 @@
   async function handleGoogleOAuth() {
     loading = true;
     oauthError = '';
+
+    // 1. Try Google Identity Services native prompt first (Instant & flawless)
+    if (browser && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            // Fallback to standard Supabase OAuth
+            loginWithGoogle().then(res => {
+              if (!res.success) {
+                oauthError = res.error || '';
+                loading = false;
+              }
+            });
+          }
+        });
+        return;
+      } catch (err) {
+        console.warn('GSI prompt failed, trying OAuth redirect:', err);
+      }
+    }
+
+    // 2. Fallback to Supabase OAuth redirect
     const res = await loginWithGoogle();
     if (!res.success) {
       oauthError = res.error || 'Google Login failed';
@@ -85,7 +166,7 @@
   function handleDirectGmailSubmit(e?: Event) {
     if (e) e.preventDefault();
     if (!manualEmail || !manualEmail.includes('@')) {
-      oauthError = 'Please enter a valid Gmail address';
+      oauthError = 'অনুগ্রহ করে সঠিক জিমেইল এড্রেস লিখুন';
       return;
     }
 
@@ -94,7 +175,6 @@
       const profile = directGoogleLogin(manualEmail, manualName);
       customer = profile;
       syncAddressFields(profile);
-      showManualInput = false;
       manualEmail = '';
       manualName = '';
       oauthError = '';
