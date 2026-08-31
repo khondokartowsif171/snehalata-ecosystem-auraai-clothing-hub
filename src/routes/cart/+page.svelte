@@ -5,6 +5,7 @@
   import { BD_LOCATIONS } from '$lib/locationData';
   import { metaTrack } from '$lib/pixel';
   import type { Order, Product, OrderStatus, TimelineEntry } from '$lib/types';
+  import { getStoredCustomer } from '$lib/customerAuth';
 
   interface CartItem extends Product {
     quantity: number;
@@ -29,6 +30,15 @@
 
   $effect(() => {
     cartItems = JSON.parse(localStorage.getItem('aura_cart') || '[]');
+
+    const cust = getStoredCustomer();
+    if (cust) {
+      if (!formData.name && cust.name) formData.name = cust.name;
+      if (!formData.email && cust.email) formData.email = cust.email;
+      if (!formData.phone && cust.phone) formData.phone = cust.phone;
+      if (!formData.address && cust.address?.street) formData.address = cust.address.street;
+      if (!formData.district && cust.address?.district) formData.district = cust.address.district;
+    }
 
     const handler = () => {
       cartItems = JSON.parse(localStorage.getItem('aura_cart') || '[]');

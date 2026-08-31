@@ -647,8 +647,8 @@
           {/if}
           <p class="text-[11px] text-gray-400 mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
             <span class="text-gray-600 uppercase tracking-[0.2em] text-[9px] font-black">সাহায্য / Support</span>
-            <a href="tel:01911877091" class="text-aura-gold font-bold hover:text-white transition-colors">📞 01911-877091</a>
-            <a href="https://wa.me/8801911877091" target="_blank" rel="noopener" class="text-aura-gold hover:text-white transition-colors">WhatsApp</a>
+            <a href="tel:01317685758" class="text-aura-gold font-bold hover:text-white transition-colors">📞 01317-685758</a>
+            <a href="https://wa.me/8801317685758" target="_blank" rel="noopener" class="text-aura-gold hover:text-white transition-colors">WhatsApp</a>
             <a href="mailto:contact@snehalata.com" class="text-aura-gold hover:text-white transition-colors">contact@snehalata.com</a>
           </p>
         </div>

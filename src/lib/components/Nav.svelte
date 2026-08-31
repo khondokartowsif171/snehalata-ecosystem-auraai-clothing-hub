@@ -2,11 +2,13 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { fade } from 'svelte/transition';
-  import { Menu, X, Sparkles, History, PackageSearch, Store, LayoutGrid, Search, Camera, Loader2, Mic, Mail } from '@lucide/svelte';
+  import { Menu, X, Sparkles, History, PackageSearch, Store, LayoutGrid, Search, Camera, Loader2, Mic, Mail, User } from '@lucide/svelte';
   import Logo from './Logo.svelte';
   import { fileToCompressedDataURL } from '$lib/imageUpload';
   import { navMenuOpen, categorySheetOpen } from '$lib/ui';
+  import { getStoredCustomer, initCustomerAuthListener, type CustomerProfile } from '$lib/customerAuth';
 
+  let currentCustomer = $state<CustomerProfile | null>(null);
   let q = $state('');
   let searchLoading = $state(false);
   let listening = $state(false);
@@ -74,7 +76,17 @@
     // detect voice support + start the rotating placeholder (paused while focused)
     voiceSupported = !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
     const ph = setInterval(() => { if (!focused) phIndex = (phIndex + 1) % PLACEHOLDERS.length; }, 2800);
-    return () => clearInterval(ph);
+    
+    currentCustomer = getStoredCustomer();
+    const unsubAuth = initCustomerAuthListener((p) => { currentCustomer = p; });
+    const onAuthEvent = (e: any) => { currentCustomer = e.detail; };
+    window.addEventListener('snehalata_customer_auth_changed', onAuthEvent);
+
+    return () => {
+      clearInterval(ph);
+      unsubAuth();
+      window.removeEventListener('snehalata_customer_auth_changed', onAuthEvent);
+    };
   });
 
 </script>
@@ -125,6 +137,14 @@
       <a href="/orders" class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] py-1 border-b-2 transition-all duration-300 {$page.url.pathname.startsWith('/orders') ? 'border-aura-green text-aura-green' : 'text-gray-500 border-transparent hover:text-white hover:-translate-y-px'}">
         <History size={14} /> History
       </a>
+      <a href="/account" class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] py-1 border-b-2 transition-all duration-300 {$page.url.pathname.startsWith('/account') ? 'border-aura-green text-aura-green' : 'text-gray-400 border-transparent hover:text-white hover:-translate-y-px'}">
+        {#if currentCustomer?.avatar_url}
+          <img src={currentCustomer.avatar_url} alt="" class="w-4 h-4 rounded-full border border-aura-green" />
+        {:else}
+          <User size={14} class="text-aura-green" />
+        {/if}
+        <span>{currentCustomer ? currentCustomer.name.split(' ')[0] : 'Account'}</span>
+      </a>
     </div>
 
     <div class="flex items-center gap-5">
@@ -174,6 +194,15 @@
         <a href="/orders" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider"
            class:text-aura-green={$page.url.pathname.startsWith('/orders')} class:text-gray-400={!$page.url.pathname.startsWith('/orders')}>
           <History size={16} /> My Orders
+        </a>
+        <a href="/account" onclick={() => navMenuOpen.set(false)} class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider"
+           class:text-aura-green={$page.url.pathname.startsWith('/account')} class:text-gray-400={!$page.url.pathname.startsWith('/account')}>
+          {#if currentCustomer?.avatar_url}
+            <img src={currentCustomer.avatar_url} alt="" class="w-4 h-4 rounded-full border border-aura-green inline-block" />
+          {:else}
+            <User size={16} />
+          {/if}
+          <span>{currentCustomer ? `Account (${currentCustomer.name.split(' ')[0]})` : 'Customer Account (Login)'}</span>
         </a>
         <a href="mailto:support@snehalata.com" class="flex items-center gap-2.5 text-sm font-black uppercase tracking-wider text-gray-400 hover:text-white">
           <Mail size={16} /> Help &amp; Support

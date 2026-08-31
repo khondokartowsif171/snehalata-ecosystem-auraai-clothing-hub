@@ -11,7 +11,7 @@
     { label: 'Categories', icon: LayoutGrid, action: () => categorySheetOpen.set(true), match: () => false },
     { label: 'AR Try-On', href: '/studio', icon: Shirt, match: (p) => p.startsWith('/studio') },
     { label: 'Track', href: '/tracking', icon: PackageSearch, match: (p) => p.startsWith('/tracking') },
-    { label: 'Account', href: '/orders', icon: User, match: (p) => p.startsWith('/orders') }
+    { label: 'Account', href: '/account', icon: User, match: (p) => p.startsWith('/account') || p.startsWith('/orders') }
   ];
 </script>
 

@@ -74,8 +74,8 @@
     </div>
     <p class="mt-6 text-sm text-gray-400">
       সাহায্য লাগবে? সরাসরি কল বা WhatsApp করুন —
-      <a href="tel:01911877091" class="text-aura-green font-bold hover:text-white transition-colors">01911-877091</a>
-      <a href="https://wa.me/8801911877091" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-lg bg-aura-green/12 border border-aura-green/30 text-aura-green text-xs font-bold hover:bg-aura-green/20 transition-colors">
+      <a href="tel:01317685758" class="text-aura-green font-bold hover:text-white transition-colors">01317-685758</a>
+      <a href="https://wa.me/8801317685758" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-lg bg-aura-green/12 border border-aura-green/30 text-aura-green text-xs font-bold hover:bg-aura-green/20 transition-colors">
         <MessageCircle size={13} /> WhatsApp
       </a>
       <br class="sm:hidden" />
