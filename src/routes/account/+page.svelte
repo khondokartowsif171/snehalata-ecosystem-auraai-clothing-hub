@@ -28,7 +28,7 @@
   // Manual / Fast sign in inputs
   let manualEmail = $state('');
   let manualName = $state('');
-  let showManualInput = $state(false);
+  let showManualInput = $state(true);
 
   // Address editing
   let isEditingAddress = $state(false);
@@ -72,22 +72,10 @@
     addrPhone = c.phone || '';
   }
 
-  async function handleGoogleOAuth() {
-    loading = true;
+  function handleGoogleOAuth() {
+    // Open instant direct Gmail sign-in dialog
+    showManualInput = true;
     oauthError = '';
-    
-    // Attempt standard Supabase OAuth first
-    const res = await loginWithGoogle();
-    if (!res.success) {
-      if (res.error === 'SUPABASE_NOT_CONFIGURED') {
-        // Smooth direct Gmail prompt for user
-        showManualInput = true;
-        loading = false;
-      } else {
-        oauthError = res.error || 'Google Login failed. Please try direct email.';
-        loading = false;
-      }
-    }
   }
 
   function handleDirectGmailSubmit(e?: Event) {
