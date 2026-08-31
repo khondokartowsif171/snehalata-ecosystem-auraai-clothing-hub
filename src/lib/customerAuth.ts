@@ -134,6 +134,33 @@ export function initCustomerAuthListener(onProfileLoaded?: (profile: CustomerPro
 
   // If Supabase is available, sync OAuth redirect session
   if (supabase) {
+    // 1. Process URL hash / code if returning from OAuth
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get('code');
+    
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (!error && data?.session?.user) {
+          const u = data.session.user;
+          const meta = u.user_metadata || {};
+          const profile: CustomerProfile = {
+            id: u.id,
+            name: meta.full_name || meta.name || u.email?.split('@')[0] || 'Customer',
+            email: u.email || '',
+            phone: u.phone || meta.phone || '',
+            avatar_url: meta.avatar_url || meta.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(meta.name || 'User')}`,
+            provider: 'google',
+            createdAt: u.created_at || new Date().toISOString(),
+          };
+          saveCustomer(profile);
+          if (onProfileLoaded) onProfileLoaded(profile);
+          // Clean up URL query
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      });
+    }
+
+    // 2. Check active Supabase session
     supabase.auth.getSession().then(({ data }) => {
       if (data?.session?.user) {
         const u = data.session.user;
