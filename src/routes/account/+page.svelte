@@ -72,10 +72,14 @@
     addrPhone = c.phone || '';
   }
 
-  function handleGoogleOAuth() {
-    // Open instant direct Gmail sign-in dialog
-    showManualInput = true;
+  async function handleGoogleOAuth() {
+    loading = true;
     oauthError = '';
+    const res = await loginWithGoogle();
+    if (!res.success) {
+      oauthError = res.error || 'Google Login failed';
+      loading = false;
+    }
   }
 
   function handleDirectGmailSubmit(e?: Event) {
