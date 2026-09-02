@@ -319,6 +319,36 @@
               {loading ? 'প্রবেশ করা হচ্ছে…' : 'লগইন সম্পন্ন করুন →'}
             </button>
           </form>
+
+          <div class="mt-4 pt-4 border-t border-white/5 space-y-2">
+            <p class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">⚡ দ্রুত ১-ক্লিক সাইন ইন:</p>
+            <div class="flex flex-col gap-2">
+              <button
+                type="button"
+                onclick={() => {
+                  manualEmail = 'amirulislamredwan71@gmail.com';
+                  manualName = 'Amirul Islam';
+                  handleDirectGmailSubmit();
+                }}
+                class="w-full px-3 py-2 rounded-xl bg-white/5 hover:bg-aura-green/15 hover:border-aura-green/30 border border-white/10 text-[11px] text-gray-300 font-medium transition-all flex items-center justify-between cursor-pointer"
+              >
+                <span>👤 Amirul Islam</span>
+                <span class="text-[10px] text-aura-gold">amirulislamredwan71@gmail.com</span>
+              </button>
+              <button
+                type="button"
+                onclick={() => {
+                  manualEmail = 'khondokarjadu@gmail.com';
+                  manualName = 'Jadu Khondokar';
+                  handleDirectGmailSubmit();
+                }}
+                class="w-full px-3 py-2 rounded-xl bg-white/5 hover:bg-aura-green/15 hover:border-aura-green/30 border border-white/10 text-[11px] text-gray-300 font-medium transition-all flex items-center justify-between cursor-pointer"
+              >
+                <span>👤 Jadu Khondokar</span>
+                <span class="text-[10px] text-aura-gold">khondokarjadu@gmail.com</span>
+              </button>
+            </div>
+          </div>
         {:else}
           <button
             onclick={() => showManualInput = true}
