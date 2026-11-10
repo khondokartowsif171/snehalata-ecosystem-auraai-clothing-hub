@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Shield, FileText, BarChart3, Mail, Phone } from '@lucide/svelte';
   import Logo from './Logo.svelte';
+  import InstallAppButton from './InstallAppButton.svelte';
 </script>
 
 <footer class="bg-[#080b09] border-t border-aura-gold/15 py-12 px-6 mt-auto">
@@ -25,6 +26,7 @@
         <li><a href="/studio" class="hover:text-aura-green transition-colors">Aura Studio · Try-On</a></li>
         <li><a href="/heritage" class="hover:text-aura-green transition-colors">তাঁতি ও মানবিকতা</a></li>
         <li><a href="/tracking" class="hover:text-aura-green transition-colors">Track My Order</a></li>
+        <li class="pt-1"><InstallAppButton variant="footer" /></li>
       </ul>
     </div>
 

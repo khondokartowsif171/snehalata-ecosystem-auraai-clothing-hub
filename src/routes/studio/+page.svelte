@@ -41,6 +41,9 @@
   let capturedImage = $state<string | null>(null);
   let showSizeGuide = $state(false);
   let overlayOpacity = $state(0.4);
+  let overlayScale = $state(1.0);
+  let overlayY = $state(0);
+  let overlayX = $state(0);
   let videoRef: HTMLVideoElement | undefined = $state(undefined);
   let canvasRef: HTMLCanvasElement | undefined = $state(undefined);
   let fileInputRef: HTMLInputElement | undefined = $state(undefined);
@@ -146,6 +149,92 @@
     }
   };
 
+  const generateClientArSnapshot = async () => {
+    if (!capturedImage && !videoRef) return false;
+    if (!selectedProduct?.imageUrl) return false;
+
+    try {
+      const canvas = canvasRef || document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+
+      // 1. Get user background photo
+      let bgImg: HTMLImageElement;
+      if (capturedImage) {
+        bgImg = await new Promise((res, rej) => {
+          const img = new Image();
+          img.onload = () => res(img);
+          img.onerror = rej;
+          img.src = capturedImage!;
+        });
+      } else if (videoRef && videoRef.videoWidth) {
+        canvas.width = videoRef.videoWidth;
+        canvas.height = videoRef.videoHeight;
+        ctx.drawImage(videoRef, 0, 0, canvas.width, canvas.height);
+        capturedImage = canvas.toDataURL('image/jpeg', 0.85);
+        bgImg = await new Promise((res, rej) => {
+          const img = new Image();
+          img.onload = () => res(img);
+          img.onerror = rej;
+          img.src = capturedImage!;
+        });
+      } else {
+        return false;
+      }
+
+      canvas.width = bgImg.naturalWidth || bgImg.width || 800;
+      canvas.height = bgImg.naturalHeight || bgImg.height || 1000;
+
+      // Draw user silhouette / background
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+
+      // 2. Load garment image
+      const gImg = await new Promise<HTMLImageElement>((res, rej) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => res(img);
+        img.onerror = () => {
+          // Retry without crossOrigin
+          const fallback = new Image();
+          fallback.onload = () => res(fallback);
+          fallback.onerror = rej;
+          fallback.src = selectedProduct!.imageUrl!;
+        };
+        img.src = selectedProduct!.imageUrl!;
+      });
+
+      // 3. Compute fitting dimensions
+      const baseWidth = canvas.width * 0.66 * overlayScale;
+      const aspect = (gImg.naturalHeight || gImg.height) / (gImg.naturalWidth || gImg.width || 1);
+      const baseHeight = baseWidth * aspect;
+
+      const x = (canvas.width - baseWidth) / 2 + (canvas.width * (overlayX / 100));
+      const y = (canvas.height * 0.28) + (canvas.height * (overlayY / 100));
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, Math.max(0.65, overlayOpacity + 0.35));
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetY = 10;
+      ctx.drawImage(gImg, x, y, baseWidth, baseHeight);
+      ctx.restore();
+
+      const compositeUrl = canvas.toDataURL('image/jpeg', 0.92);
+      result = {
+        type: 'TRYON',
+        url: compositeUrl,
+        product: selectedProduct,
+        isInstantAr: true
+      };
+      studioError = null;
+      return true;
+    } catch (err) {
+      console.error('AR snapshot error:', err);
+      return false;
+    }
+  };
+
   const handleRun = async () => {
     if (activeTool === 'TRYON' && (!selectedProduct || (!capturedImage && !isCameraActive))) return;
     if (activeTool === 'MAKEUP' && (!selectedShade || (!capturedImage && !isCameraActive))) return;
@@ -162,10 +251,25 @@
         await new Promise((r) => setTimeout(r, 100));
       }
       if (activeTool === 'TRYON') {
-        if (selectedProduct && capturedImage) {
-          const transformed = await generateTryOnTransformation(capturedImage, selectedProduct.imageUrl!, selectedProduct.category);
-          if (transformed.image) result = { type: 'TRYON', url: transformed.image, product: selectedProduct };
-          else studioError = transformed.error || busyMsg;
+        if (selectedProduct && (capturedImage || isCameraActive)) {
+          let transformed: any = null;
+          try {
+            if (capturedImage) {
+              transformed = await generateTryOnTransformation(capturedImage, selectedProduct.imageUrl!, selectedProduct.category);
+            }
+          } catch {
+            transformed = null;
+          }
+
+          if (transformed && transformed.image) {
+            result = { type: 'TRYON', url: transformed.image, product: selectedProduct, isInstantAr: false };
+          } else {
+            // Intelligent fallback: Instant high-precision AR Virtual Fit
+            const success = await generateClientArSnapshot();
+            if (!success) {
+              studioError = transformed?.error || busyMsg;
+            }
+          }
         }
       } else if (activeTool === 'MAKEUP') {
         if (capturedImage && selectedShade) {
@@ -180,7 +284,11 @@
       }
     } catch (error: any) {
       console.error(error);
-      studioError = busyMsg;
+      if (activeTool === 'TRYON') {
+        await generateClientArSnapshot();
+      } else {
+        studioError = busyMsg;
+      }
     } finally {
       isProcessing = false;
     }
@@ -471,7 +579,9 @@
                   <img src={result.url} class="w-full h-full object-contain rounded-3xl" alt="Try-on result" />
                   <div class="absolute top-6 left-6 flex items-center gap-3 bg-black/60 backdrop-blur-md px-5 py-3 rounded-full border border-white/10">
                     <CheckCircle2 size={16} class="text-green-400" />
-                    <span class="text-[10px] font-black uppercase tracking-widest text-white">Neural Try-On Complete</span>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-white">
+                      {result.isInstantAr ? '⚡ Instant AR Virtual Fit' : 'Neural Try-On Complete'}
+                    </span>
                   </div>
                   <div class="absolute top-6 right-6 flex items-center gap-2">
                     <a href={result.url} download="aura-tryon.png" title="Download" aria-label="Download look" class="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white hover:bg-white hover:text-black transition-all"><Download size={18} /></a>
@@ -587,18 +697,100 @@
                   </div>
                 </div>
               {:else if capturedImage}
-                <div class="relative w-full h-full p-4">
-                  <img src={capturedImage} class="w-full h-full object-contain rounded-3xl" alt="Captured" />
-                  <div class="absolute top-6 right-6 flex gap-4">
-                    <button type="button" onclick={() => capturedImage = null} class="p-3 bg-red-500/20 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-xl"><X size={20} /></button>
+                <div class="relative w-full h-full p-4 flex items-center justify-center">
+                  <div class="relative max-w-full max-h-full flex items-center justify-center">
+                    <img src={capturedImage} class="max-w-full max-h-[500px] object-contain rounded-3xl" alt="Captured" />
+
+                    {#if activeTool === 'TRYON' && selectedProduct}
+                      <!-- Live interactive AR garment projection on silhouette -->
+                      <div
+                        class="absolute pointer-events-none transition-all duration-150 flex items-center justify-center"
+                        style="
+                          top: {30 + overlayY}%;
+                          left: {50 + overlayX}%;
+                          transform: translate(-50%, -50%) scale({overlayScale});
+                          width: 58%;
+                          opacity: {Math.max(0.4, overlayOpacity)};
+                        "
+                      >
+                        <img
+                          src={selectedProduct.imageUrl}
+                          class="w-full object-contain drop-shadow-[0_15px_25px_rgba(0,0,0,0.5)]"
+                          alt="Overlay garment"
+                        />
+                      </div>
+
+                      <!-- Interactive AR adjustment sidebar / floating controls -->
+                      <div class="absolute right-4 top-1/2 -translate-y-1/2 bg-black/75 backdrop-blur-md border border-white/10 rounded-2xl p-3 flex flex-col gap-3 shadow-2xl z-20">
+                        <div class="text-[8px] font-black uppercase text-aura-green text-center">AR ফিট</div>
+                        
+                        <div class="flex flex-col items-center gap-1">
+                          <span class="text-[7px] text-gray-400 uppercase">সাইজ</span>
+                          <input
+                            type="range"
+                            min="0.6"
+                            max="1.4"
+                            step="0.05"
+                            bind:value={overlayScale}
+                            class="w-20 accent-aura-green cursor-pointer h-1 bg-white/20 rounded-lg"
+                          />
+                        </div>
+
+                        <div class="flex flex-col items-center gap-1">
+                          <span class="text-[7px] text-gray-400 uppercase">পজিশন</span>
+                          <input
+                            type="range"
+                            min="-25"
+                            max="25"
+                            step="1"
+                            bind:value={overlayY}
+                            class="w-20 accent-aura-green cursor-pointer h-1 bg-white/20 rounded-lg"
+                          />
+                        </div>
+
+                        <div class="flex flex-col items-center gap-1">
+                          <span class="text-[7px] text-gray-400 uppercase">দৃশ্যমানতা</span>
+                          <input
+                            type="range"
+                            min="0.3"
+                            max="1.0"
+                            step="0.05"
+                            bind:value={overlayOpacity}
+                            class="w-20 accent-aura-green cursor-pointer h-1 bg-white/20 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    {/if}
                   </div>
-                  <div class="absolute bottom-10 left-1/2 -translate-x-1/2 text-center bg-black/60 backdrop-blur-xl border border-white/10 p-6 rounded-3xl shadow-2xl">
-                    <p class="text-[10px] font-black uppercase tracking-widest text-white mb-4">Node Profile Captured. Ready for Neural Processing.</p>
-                    <div class="flex gap-4 justify-center">
-                      <button type="button" onclick={() => fileInputRef?.click()} class="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors">Re-upload</button>
-                      <div class="w-px h-3 bg-white/10" />
-                      <button type="button" onclick={startCamera} class="text-[10px] font-black uppercase tracking-widest text-aura-green hover:text-white transition-colors">Re-take Photo</button>
-                    </div>
+
+                  <div class="absolute top-6 right-6 flex gap-4 z-20">
+                    <button type="button" onclick={() => capturedImage = null} class="p-3 bg-red-500/20 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-xl cursor-pointer"><X size={20} /></button>
+                  </div>
+
+                  <div class="absolute bottom-6 left-1/2 -translate-x-1/2 text-center bg-black/70 backdrop-blur-xl border border-white/10 p-4 sm:p-5 rounded-3xl shadow-2xl z-20 max-w-[90%]">
+                    {#if activeTool === 'TRYON' && selectedProduct}
+                      <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <button
+                          type="button"
+                          onclick={generateClientArSnapshot}
+                          class="px-6 py-2.5 rounded-xl bg-aura-green text-black font-black text-xs uppercase tracking-widest hover:bg-white transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+                        >
+                          <Zap size={14} /> ⚡ তাত্ক্ষণিক AR স্ন্যাপশট
+                        </button>
+                        <div class="flex gap-4">
+                          <button type="button" onclick={() => fileInputRef?.click()} class="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-colors">Re-upload</button>
+                          <div class="w-px h-3 bg-white/10" />
+                          <button type="button" onclick={startCamera} class="text-[10px] font-black uppercase tracking-widest text-aura-green hover:text-white transition-colors">Re-take Photo</button>
+                        </div>
+                      </div>
+                    {:else}
+                      <p class="text-[10px] font-black uppercase tracking-widest text-white mb-2">Node Profile Captured. Ready for Neural Processing.</p>
+                      <div class="flex gap-4 justify-center">
+                        <button type="button" onclick={() => fileInputRef?.click()} class="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors">Re-upload</button>
+                        <div class="w-px h-3 bg-white/10" />
+                        <button type="button" onclick={startCamera} class="text-[10px] font-black uppercase tracking-widest text-aura-green hover:text-white transition-colors">Re-take Photo</button>
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {:else}

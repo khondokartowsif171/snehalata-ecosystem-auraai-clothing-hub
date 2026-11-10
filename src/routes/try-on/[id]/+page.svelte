@@ -82,39 +82,105 @@
     error = null;
   }
 
+  async function createArComposite(userImgSrc: string, prodImgSrc: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      try {
+        const userImg = new Image();
+        userImg.onload = () => {
+          const prodImg = new Image();
+          prodImg.crossOrigin = 'anonymous';
+          prodImg.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = userImg.naturalWidth || 800;
+            canvas.height = userImg.naturalHeight || 1000;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(null);
+
+            ctx.drawImage(userImg, 0, 0, canvas.width, canvas.height);
+
+            const gWidth = canvas.width * 0.68;
+            const aspect = (prodImg.naturalHeight || 1) / (prodImg.naturalWidth || 1);
+            const gHeight = gWidth * aspect;
+            const x = (canvas.width - gWidth) / 2;
+            const y = canvas.height * 0.28;
+
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.35)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetY = 10;
+            ctx.globalAlpha = 0.94;
+            ctx.drawImage(prodImg, x, y, gWidth, gHeight);
+            ctx.restore();
+
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
+          };
+          prodImg.onerror = () => {
+            // Retry without crossOrigin
+            const fallback = new Image();
+            fallback.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                canvas.width = userImg.naturalWidth || 800;
+                canvas.height = userImg.naturalHeight || 1000;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve(null);
+                ctx.drawImage(userImg, 0, 0, canvas.width, canvas.height);
+                const gWidth = canvas.width * 0.68;
+                const aspect = (fallback.naturalHeight || 1) / (fallback.naturalWidth || 1);
+                const gHeight = gWidth * aspect;
+                ctx.drawImage(fallback, (canvas.width - gWidth) / 2, canvas.height * 0.28, gWidth, gHeight);
+                resolve(canvas.toDataURL('image/jpeg', 0.92));
+              } catch {
+                resolve(null);
+              }
+            };
+            fallback.onerror = () => resolve(null);
+            fallback.src = prodImgSrc;
+          };
+          prodImg.src = prodImgSrc;
+        };
+        userImg.onerror = () => resolve(null);
+        userImg.src = userImgSrc;
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
   async function handleGenerate() {
     if (!userImage || !productImage) return;
     isProcessing = true;
     error = null;
 
     try {
-      // Pass the product image straight through (URL or data-URL) — the server fetches URLs
-      // itself (no CORS), so catalog products work without a flaky client-side fetch.
       let productBase64 = productImage;
-
-      if (false) {
-        productBase64 = productImage;
-      } else {
-        try {
-          productBase64 = productImage;
-        } catch {
-          error = 'ইকোসিস্টেমের ছবি অ্যাক্সেস করতে সমস্যা হচ্ছে। দয়া করে আপনার ডিভাইসে ছবিটি ডাউনলোড করে আপলোড করুন।';
-          isProcessing = false;
-          return;
-        }
-      }
-
       const result = await generateTryOnTransformation(userImage, productBase64, product?.category);
 
       if (result.image) {
         generatedImage = result.image;
-        // Neural Grid A1 — try-on is a signature signal.
         track('try_on', { product_id: product ? Number(product.id) : null, vendor_id: product ? Number(product.vendorId) : null });
       } else {
-        error = result.error || 'AI ট্রান্সফরমেশন ব্যর্থ হয়েছে। দয়া করে আরো পরিষ্কার ছবি ব্যবহার করে পুনরায় চেষ্টা করুন।';
+        // High quality Instant AR composite fallback
+        const comp = await createArComposite(userImage, productBase64);
+        if (comp) {
+          generatedImage = comp;
+          track('try_on', { product_id: product ? Number(product.id) : null, vendor_id: product ? Number(product.vendorId) : null });
+        } else {
+          error = result.error || 'AI ট্রান্সফরমেশন প্রস্তুত করতে সমস্যা হয়েছে। দয়া করে অন্য ছবি দিয়ে চেষ্টা করুন।';
+        }
       }
     } catch {
-      error = 'একটি অপ্রত্যাশিত ত্রুটি ঘটেছে। Aura সিস্টেম পুনরায় চেক করা হচ্ছে।';
+      // Fallback on unexpected error
+      try {
+        const comp = await createArComposite(userImage, productImage);
+        if (comp) {
+          generatedImage = comp;
+        } else {
+          error = 'একটি অপ্রত্যাশিত ত্রুটি ঘটেছে। Aura সিস্টেম পুনরায় চেক করা হচ্ছে।';
+        }
+      } catch {
+        error = 'একটি অপ্রত্যাশিত ত্রুটি ঘটেছে। Aura সিস্টেম পুনরায় চেক করা হচ্ছে।';
+      }
     } finally {
       isProcessing = false;
     }

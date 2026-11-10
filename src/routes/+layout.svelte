@@ -35,6 +35,10 @@
 
   $effect(() => {
     if (!browser) return;
+    // Register PWA service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
     // WebMCP — register Snehalata's tools so in-browser AI agents (Gemini in Chrome, etc.)
     // can search + buy on Snehalata directly. No-op in browsers without the trial.
     enableWebMcp();

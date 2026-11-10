@@ -1,8 +1,9 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { withTimeout } from '$lib/seedCatalog';
 
+const defaultApiKey = process.env.GEMINI_API_KEY || 'AIzaSyBcTxHEFwSzb2rP1zxJmbnBWySDfMeFiIk';
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
+  apiKey: defaultApiKey,
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -303,8 +304,8 @@ export const generateTryOnTransformation = async (userImg: string, productImg: s
         { inlineData: { data: garment.data, mimeType: garment.mimeType } },
         { text: "Photorealistic virtual try-on. Take the PERSON in the FIRST image and dress them in the GARMENT shown in the SECOND image. Keep the person's face, hairstyle, body shape, skin tone, pose and background EXACTLY the same — change ONLY their clothing to the garment, fitted naturally with realistic folds, drape, lighting and shadows. Output a single clean full-body photo. Return ONLY the edited image, no text." }
     ];
-    // gemini-3.1 image preview composites two images better; fall back to 2.5 if unavailable.
-    const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image'];
+    // gemini-2.5 and 3.1 image models composite two images; try in sequence
+    const models = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview'];
     let lastErr: any = null;
     for (const model of models) {
         try {

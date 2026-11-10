@@ -4,6 +4,7 @@
   import { fade } from 'svelte/transition';
   import { Menu, X, Sparkles, History, PackageSearch, Store, LayoutGrid, Search, Camera, Loader2, Mic, Mail, User } from '@lucide/svelte';
   import Logo from './Logo.svelte';
+  import InstallAppButton from './InstallAppButton.svelte';
   import { fileToCompressedDataURL } from '$lib/imageUpload';
   import { navMenuOpen, categorySheetOpen } from '$lib/ui';
   import { getStoredCustomer, initCustomerAuthListener, type CustomerProfile } from '$lib/customerAuth';
@@ -154,6 +155,7 @@
       <a href="/bazar" class="hidden xl:flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 hover:text-aura-green transition-all">
         <Store size={12} /> বাজার
       </a>
+      <InstallAppButton variant="header" />
       <a href="/sell" class="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-aura-gold/10 border border-aura-gold/25 text-[9px] font-black uppercase tracking-[0.25em] text-aura-gold hover:bg-aura-gold/20 transition-colors">
         <Store size={12} /> Sell on Snehalata
       </a>
@@ -208,6 +210,7 @@
           <Mail size={16} /> Help &amp; Support
         </a>
         <div class="h-px bg-white/10 my-1" />
+        <InstallAppButton variant="menu" />
         <a href="/sell" onclick={() => navMenuOpen.set(false)} class="flex items-center justify-center gap-2 text-sm font-black uppercase tracking-wider text-aura-gold bg-aura-gold/10 border border-aura-gold/25 rounded-xl py-3">
           <Store size={16} /> Sell on Snehalata
         </a>
