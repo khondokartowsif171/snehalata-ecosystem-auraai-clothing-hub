@@ -329,6 +329,27 @@ export const generateTryOnTransformation = async (userImg: string, productImg: s
     return null;
 };
 
+// Generates a tailored photorealistic virtual try-on prompt using Gemini Vision for the free Flux engine
+export const generateTryOnPrompt = async (userImg: string, garmentImg: string, category?: string): Promise<string | null> => {
+    try {
+        const [person, garment] = await Promise.all([imageToInline(userImg), imageToInline(garmentImg)]);
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: {
+                parts: [
+                    { inlineData: { data: person.data, mimeType: person.mimeType } },
+                    { inlineData: { data: garment.data, mimeType: garment.mimeType } },
+                    { text: `You are a virtual try-on vision AI. Analyze the person in the first image (gender, facial features, skin tone, hair, posture) and the clothing in the second image (${category || 'garment'}, color, fabric texture, embroidery, patterns). Write a concise 40-word photorealistic image generation prompt for Flux to generate this exact person naturally wearing this exact garment in an elegant modern showroom or studio setting. Output ONLY the raw prompt text without quotes or markdown.` }
+                ]
+            }
+        });
+        return response.text?.trim() || null;
+    } catch (e: any) {
+        console.error('[try-on-prompt] Gemini vision failed:', e?.message || e);
+        return null;
+    }
+};
+
 // Cosmetics try-on — a SINGLE-image selfie edit (the reliable Gemini path): recolour the
 // lips/cheeks/eyelids with the chosen shade, everything else untouched. `shade` is a colour
 // name or hex; `kind` = lipstick | blush | eyeshadow.
