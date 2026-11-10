@@ -577,18 +577,18 @@
 
             <div class="space-y-3">
               <a
-                href="https://wa.me/8801317685758"
+                href="https://wa.me/8801611877929"
                 target="_blank"
                 rel="noopener"
                 class="w-full py-3.5 px-4 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 hover:bg-emerald-600/30 transition-all"
               >
-                <MessageCircle size={16} /> WhatsApp হেল্পলাইন (+8801317685758)
+                <MessageCircle size={16} /> WhatsApp হেল্পলাইন (+8801611877929)
               </a>
               <a
-                href="tel:01317685758"
+                href="tel:01611877929"
                 class="w-full py-3.5 px-4 rounded-xl bg-white/5 border border-white/10 text-gray-300 font-bold text-xs flex items-center justify-center gap-2 hover:text-white hover:border-aura-green/40 transition-all"
               >
-                <Phone size={14} class="text-aura-gold" /> সরাসরি কল করুন (01317-685758)
+                <Phone size={14} class="text-aura-gold" /> সরাসরি কল করুন (01611-877929)
               </a>
             </div>
           </div>

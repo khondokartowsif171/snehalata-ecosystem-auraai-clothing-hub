@@ -34,8 +34,8 @@
         <li><a href="/sell" class="text-aura-gold/90 hover:text-aura-gold transition-colors">Sell on Snehalata</a></li>
         <li><a href="/onboarding" class="hover:text-aura-green transition-colors">Become a Vendor</a></li>
         <li><a href="/dashboard" class="hover:text-aura-green transition-colors">Vendor Login</a></li>
-        <li><a href="tel:01317685758" class="flex items-center gap-2 hover:text-aura-green transition-colors"><Phone size={13} class="text-aura-green" /> 01317-685758</a></li>
-        <li><a href="https://wa.me/8801317685758" target="_blank" rel="noopener" class="text-[11px] text-gray-500 hover:text-aura-green transition-colors">দোকান খুলতে WhatsApp করুন →</a></li>
+        <li><a href="tel:01611877929" class="flex items-center gap-2 hover:text-aura-green transition-colors"><Phone size={13} class="text-aura-green" /> 01611-877929</a></li>
+        <li><a href="https://wa.me/8801611877929" target="_blank" rel="noopener" class="text-[11px] text-gray-500 hover:text-aura-green transition-colors">দোকান খুলতে WhatsApp করুন →</a></li>
       </ul>
     </div>
 
