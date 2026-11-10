@@ -33,24 +33,6 @@ export const POST = async ({ request }) => {
     }
   }
 
-  // 3) Free Generative AI Try-On (Gemini 2.5 Vision + Flux Photorealism)
-  try {
-    const prompt = await gemini.generateTryOnPrompt(userImg, productImg, category);
-    if (prompt) {
-      const cleanPrompt = encodeURIComponent(prompt.slice(0, 280).replace(/[\r\n\t]/g, ' '));
-      const fluxUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=768&height=1024&model=flux&nologo=true`;
-      const res = await fetch(fluxUrl);
-      if (res.ok) {
-        const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.length > 5000) {
-          return json({ image: `data:image/jpeg;base64,${buf.toString('base64')}` });
-        }
-      }
-    }
-  } catch (fluxErr: any) {
-    console.error('[try-on] Free Flux tier failed:', fluxErr?.message || fluxErr);
-  }
-
   // Honest failure — no image was produced.
   if (gemQuota) {
     return json({

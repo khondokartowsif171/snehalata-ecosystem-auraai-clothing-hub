@@ -1,9 +1,8 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { withTimeout } from '$lib/seedCatalog';
 
-const defaultApiKey = process.env.GEMINI_API_KEY || 'AIzaSyBcTxHEFwSzb2rP1zxJmbnBWySDfMeFiIk';
 const ai = new GoogleGenAI({
-  apiKey: defaultApiKey,
+  apiKey: process.env.GEMINI_API_KEY || '',
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
@@ -304,8 +303,8 @@ export const generateTryOnTransformation = async (userImg: string, productImg: s
         { inlineData: { data: garment.data, mimeType: garment.mimeType } },
         { text: "Photorealistic virtual try-on. Take the PERSON in the FIRST image and dress them in the GARMENT shown in the SECOND image. Keep the person's face, hairstyle, body shape, skin tone, pose and background EXACTLY the same — change ONLY their clothing to the garment, fitted naturally with realistic folds, drape, lighting and shadows. Output a single clean full-body photo. Return ONLY the edited image, no text." }
     ];
-    // gemini-2.5 and 3.1 image models composite two images; try in sequence
-    const models = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview'];
+    // gemini-3.1 image preview composites two images better; fall back to 2.5 if unavailable.
+    const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image'];
     let lastErr: any = null;
     for (const model of models) {
         try {
@@ -327,27 +326,6 @@ export const generateTryOnTransformation = async (userImg: string, productImg: s
     }
     if (lastErr) console.error('[try-on] both image models failed:', lastErr?.message || lastErr);
     return null;
-};
-
-// Generates a tailored photorealistic virtual try-on prompt using Gemini Vision for the free Flux engine
-export const generateTryOnPrompt = async (userImg: string, garmentImg: string, category?: string): Promise<string | null> => {
-    try {
-        const [person, garment] = await Promise.all([imageToInline(userImg), imageToInline(garmentImg)]);
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: {
-                parts: [
-                    { inlineData: { data: person.data, mimeType: person.mimeType } },
-                    { inlineData: { data: garment.data, mimeType: garment.mimeType } },
-                    { text: `You are a virtual try-on vision AI. Analyze the person in the first image (gender, facial features, skin tone, hair, posture) and the clothing in the second image (${category || 'garment'}, color, fabric texture, embroidery, patterns). Write a concise 40-word photorealistic image generation prompt for Flux to generate this exact person naturally wearing this exact garment in an elegant modern showroom or studio setting. Output ONLY the raw prompt text without quotes or markdown.` }
-                ]
-            }
-        });
-        return response.text?.trim() || null;
-    } catch (e: any) {
-        console.error('[try-on-prompt] Gemini vision failed:', e?.message || e);
-        return null;
-    }
 };
 
 // Cosmetics try-on — a SINGLE-image selfie edit (the reliable Gemini path): recolour the
