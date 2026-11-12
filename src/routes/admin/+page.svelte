@@ -155,7 +155,11 @@
       } else {
         homeCats = seedHomeCatsFromDefaults();
       }
-      featuredSlugs = (cfg?.featured?.vendorSlugs ?? ['panjabi-kuthir']).join(', ');
+      featuredSlugs = (cfg?.featured?.vendorSlugs ?? ['panjabi-kuthir'])
+        .flatMap((s: string) => String(s || '').split(/[\s,;|.]+/))
+        .map((s: string) => s.trim())
+        .filter(Boolean)
+        .join(', ');
       if (cfg?.commission) commissionCfg = { mode: cfg.commission.mode === 'aura' ? 'aura' : 'fixed', base: Number(cfg.commission.base) || 10, min: Number(cfg.commission.min) || 6, max: Number(cfg.commission.max) || 11 };
     } catch {
       homeCats = seedHomeCatsFromDefaults();
@@ -210,7 +214,7 @@
     configMsg = 'Saving…';
     try {
       const categories = homeCats.map((c, i) => ({ ...c, order: i }));
-      const featured = { vendorSlugs: featuredSlugs.split(',').map(s => s.trim()).filter(Boolean), productIds: [] };
+      const featured = { vendorSlugs: featuredSlugs.split(/[\s,;|.]+/).map(s => s.trim()).filter(Boolean), productIds: [] };
       const r = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass() },
@@ -1289,11 +1293,16 @@
             {:else}
               <div class="space-y-4">
                 {#each dbOrders as o (o.id)}
+                  {@const orderNote = String(o.note || '')}
+                  {@const ch = /whatsapp/i.test(orderNote) ? 'WhatsApp' : /messenger/i.test(orderNote) ? 'Messenger' : /aura bot/i.test(orderNote) ? 'Aura Bot' : 'Web'}
                   <div class="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
                     <div class="p-5 flex flex-col lg:flex-row lg:items-center gap-4">
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
                           <span class="font-mono text-aura-green text-sm font-black">ORD-{o.id}</span>
+                          <span class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border {ch === 'WhatsApp' ? 'bg-green-500/15 text-green-400 border-green-500/30' : ch === 'Messenger' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30' : 'bg-white/5 text-gray-400 border-white/15'}">
+                            {ch === 'WhatsApp' ? '📱 WhatsApp' : ch === 'Messenger' ? '💬 Messenger' : ch}
+                          </span>
                           <span class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border {o.payment_method === 'COD' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}">{o.payment_method}</span>
                           <span class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border {o.payment_status === 'PAID' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}">{o.payment_status}</span>
                           {#if o.fraud_score != null && o.fraud_score >= 50}

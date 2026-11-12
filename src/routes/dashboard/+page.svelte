@@ -713,19 +713,39 @@
                 <BarChart3 class="text-aura-green" size={28} />
                 <h2 class="text-3xl font-serif font-black italic">নতুন অর্ডার</h2>
               </div>
-              <span class="text-[10px] font-black uppercase tracking-widest text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10">{vendorOrders.length} items</span>
+              <div class="flex items-center gap-3">
+                <button
+                  onclick={() => loadVendorOrders()}
+                  class="text-[10px] font-black uppercase tracking-widest text-aura-green bg-aura-green/10 hover:bg-aura-green/20 px-3 py-2 rounded-full border border-aura-green/30 transition-all cursor-pointer"
+                >↻ রিফ্রেশ</button>
+                <span class="text-[10px] font-black uppercase tracking-widest text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/10">{vendorOrders.length} items</span>
+              </div>
             </div>
             {#if vendorOrders.length === 0}
               <div class="py-16 border-2 border-dashed border-white/5 rounded-[3rem] text-center text-gray-700 text-sm font-serif italic">No orders yet for your products.</div>
             {:else}
               <div class="space-y-4">
                 {#each vendorOrders as it (it.id)}
+                  {@const orderNote = String(it.orders?.note || '')}
+                  {@const ch = /whatsapp/i.test(orderNote) ? 'WhatsApp' : /messenger/i.test(orderNote) ? 'Messenger' : /aura bot/i.test(orderNote) ? 'Aura Bot' : 'Web'}
                   <div class="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                     {#if it.image_url}<img src={it.image_url} class="w-14 h-14 rounded-xl object-cover shrink-0" alt={it.name} />{/if}
                     <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 flex-wrap mb-1">
+                        <span class="font-mono text-[10px] text-aura-green font-black">ORD-{it.orders?.id}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border {ch === 'WhatsApp' ? 'bg-green-500/15 text-green-400 border-green-500/30' : ch === 'Messenger' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30' : 'bg-white/5 text-gray-400 border-white/15'}">
+                          {ch === 'WhatsApp' ? '📱 WhatsApp' : ch === 'Messenger' ? '💬 Messenger' : ch}
+                        </span>
+                        {#if it.tracking}
+                          <a href="/tracking/{it.tracking}" target="_blank" class="text-[9px] font-mono text-gray-400 hover:text-white underline">{it.tracking}</a>
+                        {/if}
+                        {#if it.orders?.courier_tracking_code}
+                          <span class="px-2 py-0.5 rounded-full text-[8px] font-mono font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">🚚 {it.orders.courier_tracking_code}</span>
+                        {/if}
+                      </div>
                       <p class="text-white font-bold text-sm truncate">{it.name} <span class="text-gray-500">×{it.quantity}</span></p>
-                      <p class="text-[10px] text-gray-500 truncate">ORD-{it.orders?.id} · {it.orders?.customer_name} · {it.orders?.customer_phone}</p>
-                      <p class="text-[10px] text-gray-600 truncate">{it.orders?.district} — {it.orders?.address}</p>
+                      <p class="text-[10px] text-gray-400 truncate">{it.orders?.customer_name} · {it.orders?.customer_phone}</p>
+                      <p class="text-[10px] text-gray-600 truncate">{it.orders?.district ? it.orders.district + ' — ' : ''}{it.orders?.address}</p>
                     </div>
                     <div class="text-right shrink-0">
                       <p class="text-green-400 font-black">৳{Number(it.vendor_payout).toLocaleString()}</p>

@@ -45,13 +45,30 @@ export function normalizeCommission(c: any): CommissionCfg {
   };
 }
 
+/** Normalise featured vendor slugs cleanly even if separated by spaces, dots or semicolons. */
+export function normalizeFeaturedSlugs(raw: unknown): string[] {
+  const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? [raw] : []);
+  const out: string[] = [];
+  for (const item of arr) {
+    for (const part of String(item || '').split(/[\s,;|.]+/)) {
+      const s = part.trim().toLowerCase();
+      if (s && !out.includes(s)) out.push(s);
+    }
+  }
+  return out;
+}
+
 /** Read the site config JSON from Storage. Returns {} if missing/unreadable. */
 export async function readSiteConfig(): Promise<SiteConfig> {
   try {
     const { data, error } = await adminClient().storage.from(BUCKET).download(CONFIG_PATH);
     if (error || !data) return {};
     const text = await data.text();
-    return text ? (JSON.parse(text) as SiteConfig) : {};
+    const parsed = text ? (JSON.parse(text) as SiteConfig) : {};
+    if (parsed?.featured?.vendorSlugs) {
+      parsed.featured.vendorSlugs = normalizeFeaturedSlugs(parsed.featured.vendorSlugs);
+    }
+    return parsed;
   } catch {
     return {};
   }

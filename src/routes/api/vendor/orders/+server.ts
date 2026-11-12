@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { adminClient } from '$lib/server/vendorSync';
+import { encodeTracking } from '$lib/trackingCode';
 import type { RequestHandler } from './$types';
 
 async function vendorFromToken(request: Request) {
@@ -23,7 +24,34 @@ export const GET: RequestHandler = async ({ request }) => {
     .eq('vendor_id', vend.id)
     .order('id', { ascending: false });
   if (e) throw error(500, e.message);
-  return json({ ok: true, items: data });
+
+  // Best-effort attach courier tracking fields if migrated on orders table
+  const orderIds = [...new Set((data || []).map((it: any) => it.order_id || it.orders?.id).filter(Boolean))];
+  const courierMap: Record<string, { courier_tracking_code?: string | null; courier_status?: string | null }> = {};
+  if (orderIds.length) {
+    try {
+      const { data: cs } = await admin
+        .from('orders')
+        .select('id, courier_tracking_code, courier_status')
+        .in('id', orderIds);
+      for (const c of cs || []) {
+        courierMap[String(c.id)] = {
+          courier_tracking_code: c.courier_tracking_code ?? null,
+          courier_status: c.courier_status ?? null
+        };
+      }
+    } catch {
+      /* courier_* columns absent — ignore cleanly */
+    }
+  }
+
+  const enriched = (data || []).map((it: any) => {
+    const o = it.orders ? { ...it.orders, ...(courierMap[String(it.orders.id)] || {}) } : null;
+    const tracking = o?.id ? encodeTracking(o.id, new Date(o.created_at || Date.now())) : '';
+    return { ...it, orders: o, tracking };
+  });
+
+  return json({ ok: true, items: enriched });
 };
 
 // Vendor updates the fulfillment status of their own line-item.

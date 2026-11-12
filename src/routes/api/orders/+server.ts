@@ -6,6 +6,8 @@ import type { RequestHandler } from './$types';
 
 const money = (n: number) => Math.round(n * 100) / 100;
 
+const DHAKA_HINTS = /\b(dhaka|dhanmondi|mirpur|uttara|gulshan|banani|mohammadpur|badda|motijheel|khilgaon|rampura|bashundhara|farmgate|moghbazar|malibagh|jatrabari|wari|lalbagh|azimpur|tejgaon|cantonment|mugda|demra|kalabagan|panthapath|shahbag|adabor|shyamoli|baridhara|niketan|nikunja|agargaon|banasree)\b|(?:ঢাকা|ধানমন্ডি|মিরপুর|উত্তরা|গুলশান|বনানী|মোহাম্মদপুর|বাড্ডা|মতিঝিল|খিলগাঁও|রামপুরা|বসুন্ধরা|ফার্মগেট|মগবাজার|মালিবাগ|যাত্রাবাড়ী|ওয়ারী|লালবাগ|আজিমপুর|তেজগাঁও|শ্যামলী|বারিধারা|আগারগাঁও|বনশ্রী)/i;
+
 // Public checkout: creates one order + per-vendor line items with commission/payout.
 // A cart may mix vendors — the order is single (customer-facing) but split per item
 // for vendor fulfillment + payout. Prices are re-read from the DB (never trust client).
@@ -14,10 +16,52 @@ export const POST: RequestHandler = async ({ request }) => {
   const c = b?.customer || {};
   const items = Array.isArray(b?.items) ? b.items : [];
   const pay = b?.payment || {};
+  const rawChannel = String(b?.channel || '').toLowerCase().trim();
+  const channelLabel = rawChannel === 'whatsapp' ? 'WhatsApp' : rawChannel === 'messenger' ? 'Messenger' : rawChannel === 'bot' ? 'Aura Bot' : '';
   if (!c.name || !c.phone || !c.address) throw error(400, 'Name, phone and address are required');
   if (!items.length) throw error(400, 'Your cart is empty');
 
   const a = adminClient();
+
+  // Duplicate-order idempotency guard (webhook retries / repeated taps within 10 minutes).
+  try {
+    const cleanPhone = String(c.phone || '').trim();
+    const reqKey = items
+      .map((i: any) => `${Number(i.id)}x${Math.max(1, Number(i.quantity) || 1)}`)
+      .sort()
+      .join('|');
+    if (cleanPhone && reqKey) {
+      const sinceIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: recent } = await a
+        .from('orders')
+        .select('id, total, created_at, order_items(product_id, quantity)')
+        .eq('customer_phone', cleanPhone)
+        .gte('created_at', sinceIso)
+        .order('id', { ascending: false })
+        .limit(5);
+      for (const ro of recent || []) {
+        const roKey = (ro.order_items || [])
+          .map((it: any) => `${Number(it.product_id)}x${Math.max(1, Number(it.quantity) || 1)}`)
+          .sort()
+          .join('|');
+        if (roKey === reqKey) {
+          const dupTracking = encodeTracking(ro.id, new Date(ro.created_at || Date.now()));
+          return json({
+            ok: true,
+            duplicate: true,
+            orderId: ro.id,
+            tracking: dupTracking,
+            trackingUrl: `https://www.snehalata.com/tracking/${dupTracking}`,
+            total: Number(ro.total) || 0,
+            itemCount: (ro.order_items || []).length
+          });
+        }
+      }
+    }
+  } catch {
+    /* non-fatal — continue with normal order creation */
+  }
+
   const ids = [...new Set(items.map((i: any) => Number(i.id)).filter(Boolean))];
   const { data: prods } = await a.from('products').select('id,name,price,image_url,vendor_id').in('id', ids);
   const byId = new Map((prods || []).map((p: any) => [p.id, p]));
@@ -86,13 +130,22 @@ export const POST: RequestHandler = async ({ request }) => {
   }
   if (!lineItems.length) throw error(400, 'No valid products in your cart');
 
-  const shipping = String(c.district || '').toLowerCase() === 'dhaka' ? 78 : 118;
+  const isDhaka = c.district
+    ? String(c.district).toLowerCase() === 'dhaka'
+    : DHAKA_HINTS.test(String(c.address || ''));
+  const shipping = isDhaka ? 78 : 118;
   const total = money(subtotal + shipping);
   const method = ['COD', 'BKASH', 'NAGAD', 'ONLINE'].includes(pay.method) ? pay.method : 'COD';
 
+  const orderNote = [
+    channelLabel ? `[Channel: ${channelLabel}]` : '',
+    c.note || '',
+    b.note || ''
+  ].filter(Boolean).join(' · ');
+
   const { data: order, error: oe } = await a.from('orders').insert({
     customer_name: c.name, customer_phone: c.phone, customer_email: c.email || null,
-    district: c.district || '', area: c.area || '', address: c.address, note: c.note || '',
+    district: c.district || (isDhaka ? 'Dhaka' : ''), area: c.area || '', address: c.address, note: orderNote,
     payment_method: method, payment_txid: pay.txid || null, payment_status: 'PENDING',
     subtotal: money(subtotal), shipping, total, status: 'PLACED',
     commission_total: money(commissionTotal), vendor_payout_total: money(payoutTotal)
@@ -153,5 +206,13 @@ export const POST: RequestHandler = async ({ request }) => {
     // fraud columns not migrated yet — order still succeeds.
   }
 
-  return json({ ok: true, orderId: order.id, tracking: encodeTracking(order.id, new Date(order.created_at || Date.now())), total, itemCount: lineItems.length });
+  const tracking = encodeTracking(order.id, new Date(order.created_at || Date.now()));
+  return json({
+    ok: true,
+    orderId: order.id,
+    tracking,
+    trackingUrl: `https://www.snehalata.com/tracking/${tracking}`,
+    total,
+    itemCount: lineItems.length
+  });
 };
