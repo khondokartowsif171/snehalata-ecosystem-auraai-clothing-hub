@@ -323,24 +323,80 @@
     }
   }
 
-  let shippingId = $state<number | null>(null);
-  async function handleShip(id: number) {
-    if (shippingId) return;
-    shippingId = id;
+  // ── Aura Courier MCP Integration (Steadfast, Pathao, RedX, Paperfly, Auto) ──
+  let auraDispatchModal = $state<any | null>(null);
+  let auraSelectedCourier = $state<'auto' | 'steadfast' | 'pathao' | 'redx' | 'paperfly'>('auto');
+  let auraUseVendorByok = $state(false);
+  let auraRatesLoading = $state(false);
+  let auraRateData = $state<any | null>(null);
+  let auraDispatchLoading = $state(false);
+  let auraTrackingModal = $state<any | null>(null);
+  let auraTrackingLoading = $state(false);
+
+  async function openAuraDispatchModal(order: any) {
+    auraDispatchModal = order;
+    auraSelectedCourier = 'auto';
+    auraUseVendorByok = false;
+    auraRateData = null;
+    auraRatesLoading = true;
+    try {
+      const res = await fetch('/api/admin/orders/rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass() },
+        body: JSON.stringify({ orderId: order.id })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        auraRateData = d.comparison || null;
+      }
+    } catch {
+      auraRateData = null;
+    } finally {
+      auraRatesLoading = false;
+    }
+  }
+
+  async function confirmAuraDispatch() {
+    if (!auraDispatchModal || auraDispatchLoading) return;
+    auraDispatchLoading = true;
     try {
       const res = await fetch('/api/admin/orders/ship', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-pass': adminPass() },
-        body: JSON.stringify({ orderId: id })
+        body: JSON.stringify({
+          orderId: auraDispatchModal.id,
+          courier: auraSelectedCourier,
+          use_vendor_byok: auraUseVendorByok
+        })
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
-      alert(`Steadfast-এ courier বুক হয়েছে ✓\nTracking: ${d.tracking_code || d.consignment_id || 'ok'}`);
+      alert(`Aura Courier MCP বুকিং সফল হয়েছে ✓\nকুরিয়ার: ${(d.courier || auraSelectedCourier).toUpperCase()}\nTracking: ${d.tracking_code || d.consignment_id || 'ok'}`);
+      auraDispatchModal = null;
       await loadOrders();
     } catch (err: any) {
-      alert('Courier booking failed: ' + (err?.message || 'error'));
+      alert('Aura Courier booking failed: ' + (err?.message || 'error'));
     } finally {
-      shippingId = null;
+      auraDispatchLoading = false;
+    }
+  }
+
+  async function openUniversalTracking(trackingCode: string) {
+    if (!trackingCode) return;
+    auraTrackingModal = { code: trackingCode, data: null };
+    auraTrackingLoading = true;
+    try {
+      const res = await fetch(`/api/admin/orders/track?code=${encodeURIComponent(trackingCode)}`, {
+        headers: { 'x-admin-pass': adminPass() }
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        auraTrackingModal = { code: trackingCode, data: d.tracking || null };
+      }
+    } catch {
+      auraTrackingModal = { code: trackingCode, data: null };
+    } finally {
+      auraTrackingLoading = false;
     }
   }
 
@@ -694,13 +750,91 @@
     }
   }
 
-  function handleSearchOrder(id: string) {
+  async function handleSearchOrder(input: string) {
+    const q = input.trim();
+    if (!q) return;
     isTrackingLoading = true;
-    setTimeout(() => {
-      const found = getOrderById(id);
-      trackedOrder = found || null;
+    try {
+      const cleanId = q.replace(/^ORD-/i, '');
+      const foundInDb = (dbOrders || []).find((o: any) =>
+        String(o.id) === cleanId ||
+        String(o.courier_tracking_code || '').toLowerCase() === q.toLowerCase() ||
+        String(o.courier_consignment_id || '').toLowerCase() === q.toLowerCase() ||
+        String(o.customer_phone || '').includes(q)
+      );
+
+      if (foundInDb) {
+        let courierTimeline = [
+          { status: 'PLACED', completed: true, timestamp: new Date(foundInDb.created_at || Date.now()).toLocaleDateString('en-GB') },
+          { status: 'CONFIRMED', completed: ['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(foundInDb.status), timestamp: foundInDb.status !== 'PLACED' ? 'Verified' : '' },
+          { status: 'SHIPPED', completed: ['SHIPPED', 'DELIVERED'].includes(foundInDb.status), timestamp: foundInDb.courier_tracking_code ? `🚚 ${foundInDb.courier_provider || 'Courier'}` : '' },
+          { status: 'DELIVERED', completed: foundInDb.status === 'DELIVERED', timestamp: foundInDb.status === 'DELIVERED' ? 'Completed' : '' }
+        ];
+
+        // If tracked by Aura Courier MCP, fetch live courier milestones
+        if (foundInDb.courier_tracking_code) {
+          try {
+            const trRes = await fetch(`/api/admin/orders/track?code=${encodeURIComponent(foundInDb.courier_tracking_code)}`, {
+              headers: { 'x-admin-pass': adminPass() }
+            });
+            const trData = await trRes.json().catch(() => ({}));
+            if (trRes.ok && trData.tracking?.timeline?.length) {
+              courierTimeline = trData.tracking.timeline.map((ev: any) => ({
+                status: ev.status,
+                completed: true,
+                timestamp: ev.timestamp,
+                note: ev.note
+              }));
+            }
+          } catch {
+            /* use default timeline */
+          }
+        }
+
+        trackedOrder = {
+          id: `ORD-${foundInDb.id}`,
+          customerName: foundInDb.customer_name,
+          customerPhone: foundInDb.customer_phone,
+          customerAddress: `${foundInDb.district ? foundInDb.district + ' · ' : ''}${foundInDb.address || ''}`,
+          total: Number(foundInDb.total),
+          currentStatus: foundInDb.status,
+          courierTrackingCode: foundInDb.courier_tracking_code,
+          courierProvider: foundInDb.courier_provider,
+          timeline: courierTimeline
+        };
+      } else {
+        // Direct tracking code lookup on Aura Courier MCP
+        const trRes = await fetch(`/api/admin/orders/track?code=${encodeURIComponent(q)}`, {
+          headers: { 'x-admin-pass': adminPass() }
+        });
+        const trData = await trRes.json().catch(() => ({}));
+        if (trRes.ok && trData.tracking) {
+          const t = trData.tracking;
+          trackedOrder = {
+            id: q,
+            customerName: 'Consignment Lookup',
+            customerPhone: '',
+            customerAddress: t.current_location || 'Bangladesh',
+            total: 0,
+            currentStatus: t.status || 'IN_TRANSIT',
+            courierTrackingCode: t.tracking_code || q,
+            courierProvider: t.courier || 'Courier',
+            timeline: (t.timeline || []).map((ev: any) => ({
+              status: ev.status,
+              completed: true,
+              timestamp: ev.timestamp,
+              note: ev.note
+            }))
+          };
+        } else {
+          trackedOrder = getOrderById(q) || null;
+        }
+      }
+    } catch {
+      trackedOrder = getOrderById(q) || null;
+    } finally {
       isTrackingLoading = false;
-    }, 800);
+    }
   }
 
   function handleOverridePhase(phase: string) {
@@ -1314,7 +1448,12 @@
                         <p class="text-white font-bold text-sm mt-1 truncate">{o.customer_name} · {o.customer_phone}</p>
                         <p class="text-[10px] text-gray-500 truncate">{o.district} · {o.area} — {o.address}</p>
                         {#if o.payment_txid}<p class="text-[9px] text-gray-600 font-mono">TxID: {o.payment_txid}</p>{/if}
-                        {#if o.courier_tracking_code}<p class="text-[9px] text-aura-green font-mono font-black">🚚 Steadfast: {o.courier_tracking_code}</p>{/if}
+                        {#if o.courier_tracking_code}
+                          <p class="text-[9px] text-aura-green font-mono font-black flex items-center gap-1.5 mt-0.5">
+                            <span>🚚 {o.courier_provider ? o.courier_provider.toUpperCase() : 'COURIER'}: {o.courier_tracking_code}</span>
+                            {#if o.courier_status}<span class="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300">({o.courier_status})</span>{/if}
+                          </p>
+                        {/if}
                       </div>
                       <div class="text-right shrink-0">
                         <p class="text-lg font-black text-white">৳{Number(o.total).toLocaleString()}</p>
@@ -1323,10 +1462,17 @@
                       </div>
                       <div class="flex items-center gap-2 shrink-0">
                         {#if !o.courier_tracking_code}
-                          <button onclick={() => handleShip(o.id)} disabled={shippingId === o.id}
-                            class="px-3 py-2 rounded-xl bg-aura-green/15 border border-aura-green/30 text-aura-green text-[10px] font-black uppercase tracking-widest hover:bg-aura-green hover:text-black transition-all disabled:opacity-50 cursor-pointer whitespace-nowrap"
-                            title="Steadfast কুরিয়ারে বুক করুন">
-                            {shippingId === o.id ? 'বুকিং…' : '🚚 Courier'}
+                          <button onclick={() => openAuraDispatchModal(o)}
+                            class="px-3 py-2 rounded-xl bg-gradient-to-r from-aura-green/20 via-emerald-500/20 to-aura-green/20 border border-aura-green/40 text-aura-green text-[10px] font-black uppercase tracking-widest hover:bg-aura-green hover:text-black transition-all cursor-pointer whitespace-nowrap shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-1.5"
+                            title="Aura Courier MCP (Steadfast, Pathao, RedX, Paperfly, Auto) দিয়ে বুক করুন">
+                            <Zap size={11} class="fill-current" />
+                            <span>🚚 Aura Ship</span>
+                          </button>
+                        {:else}
+                          <button onclick={() => openUniversalTracking(o.courier_tracking_code)}
+                            class="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+                            title="লাইভ কুরিয়ার ট্র্যাকিং দেখুন">
+                            <span>🚚 {o.courier_provider ? o.courier_provider.toUpperCase() : 'COURIER'}</span>
                           </button>
                         {/if}
                         <select value={o.status} onchange={(e) => handleOrderStatus(o.id, e.currentTarget.value)}
@@ -1411,13 +1557,13 @@
                         </div>
                         <div class="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
                           <CreditCard size={12} class="text-gray-500" />
-                          <span class="text-[10px] font-bold text-gray-300">EST. {trackedOrder.estimatedDelivery}</span>
+                          <span class="text-[10px] font-bold text-gray-300">EST. {trackedOrder.estimatedDelivery || '24-48 Hours'}</span>
                         </div>
                       </div>
                     </div>
                     <div class="text-right">
                       <div class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Total Valuation</div>
-                      <div class="text-4xl font-black text-green-400 font-mono tracking-tighter">৳{trackedOrder.totalAmount.toLocaleString()}</div>
+                      <div class="text-4xl font-black text-green-400 font-mono tracking-tighter">৳{(trackedOrder.totalAmount ?? trackedOrder.total ?? 0).toLocaleString()}</div>
                     </div>
                   </div>
 
@@ -1803,6 +1949,227 @@
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- ── Aura Courier MCP 4-in-1 Dispatch Modal ── -->
+    {#if auraDispatchModal}
+      <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" transition:fade={{ duration: 150 }}>
+        <div class="bg-[#0b120e] border border-aura-green/30 rounded-3xl p-6 sm:p-8 max-w-xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-[0_0_60px_rgba(16,185,129,0.15)] text-left relative" transition:scale={{ duration: 150, start: 0.95 }}>
+          <!-- Close Button -->
+          <button onclick={() => auraDispatchModal = null} class="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer">
+            <XCircle size={20} />
+          </button>
+
+          <!-- Modal Header -->
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-widest bg-aura-green/20 text-aura-green border border-aura-green/40">Aura Courier MCP · v2.6.1</span>
+              <span class="text-xs text-gray-500 font-mono">ORD-{auraDispatchModal.id}</span>
+            </div>
+            <h3 class="text-2xl font-serif font-black text-white italic">4-in-1 Courier Dispatch Hub</h3>
+            <p class="text-xs text-gray-400 mt-1">
+              গ্রাহক: <strong class="text-white">{auraDispatchModal.customer_name}</strong> · 📱 {auraDispatchModal.customer_phone}
+            </p>
+            <p class="text-[11px] text-gray-500 mt-0.5 truncate">
+              📍 {auraDispatchModal.district ? auraDispatchModal.district + ' · ' : ''}{auraDispatchModal.area ? auraDispatchModal.area + ' — ' : ''}{auraDispatchModal.address}
+            </p>
+          </div>
+
+          <!-- Order Financials Strip -->
+          <div class="grid grid-cols-3 gap-3 p-3.5 bg-black/50 border border-white/5 rounded-2xl text-center">
+            <div>
+              <p class="text-[9px] text-gray-500 uppercase tracking-widest font-black">Total</p>
+              <p class="text-sm font-black text-white">৳{Number(auraDispatchModal.total).toLocaleString()}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-gray-500 uppercase tracking-widest font-black">Payment</p>
+              <p class="text-sm font-black text-orange-400">{auraDispatchModal.payment_method}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-gray-500 uppercase tracking-widest font-black">COD Collect</p>
+              <p class="text-sm font-black text-green-400">
+                ৳{auraDispatchModal.payment_method === 'COD' && auraDispatchModal.payment_status !== 'PAID' ? Number(auraDispatchModal.total).toLocaleString() : 0}
+              </p>
+            </div>
+          </div>
+
+          <!-- Carrier Selector -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+              <span>কুরিয়ার সার্ভিস বেছে নিন</span>
+              <span class="text-aura-green font-mono">Carrier: {auraSelectedCourier.toUpperCase()}</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {#each [
+                { id: 'auto', label: '⚡ Auto Smart', sub: 'AI Best Rate' },
+                { id: 'steadfast', label: '🚚 Steadfast', sub: 'National Flat Rate' },
+                { id: 'pathao', label: '⚡ Pathao', sub: 'Fast Express SLA' },
+                { id: 'redx', label: '📦 RedX', sub: 'Deep Sublocality' },
+                { id: 'paperfly', label: '🦅 Paperfly', sub: 'Door-to-Door' }
+              ] as c}
+                <button
+                  type="button"
+                  onclick={() => auraSelectedCourier = c.id as any}
+                  class="p-2.5 rounded-xl border text-left transition-all cursor-pointer {auraSelectedCourier === c.id ? 'bg-aura-green/20 border-aura-green text-white shadow-[0_0_15px_rgba(16,185,129,0.25)]' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'}"
+                >
+                  <p class="text-xs font-black">{c.label}</p>
+                  <p class="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">{c.sub}</p>
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          <!-- Live Rate & SLA Comparison from Aura Courier MCP -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">লাইভ কুরিয়ার রেট ও এসএলএ তুলনা</span>
+              {#if auraRatesLoading}
+                <span class="text-[9px] text-aura-green flex items-center gap-1 font-mono"><Loader2 size={10} class="animate-spin" /> ক্যালকুলেট হচ্ছে…</span>
+              {/if}
+            </div>
+            {#if auraRateData}
+              <div class="p-3 bg-white/5 border border-white/10 rounded-2xl space-y-2 text-xs">
+                <div class="flex items-center justify-between text-[10px] pb-1 border-b border-white/5">
+                  <span class="text-gray-400">Zone: <strong class="text-white font-mono">{auraRateData.zone_title || auraRateData.zone}</strong></span>
+                  <span class="text-aura-green font-bold">Recommended: {auraRateData.recommended_courier?.toUpperCase()}</span>
+                </div>
+                {#if auraRateData.recommendation_reason}
+                  <p class="text-[10px] text-gray-400 italic">💡 {auraRateData.recommendation_reason}</p>
+                {/if}
+                {#if auraRateData.rates && auraRateData.rates.length}
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    {#each auraRateData.rates as r}
+                      <div class="p-2 rounded-lg bg-black/40 border {r.courier === auraRateData.recommended_courier ? 'border-aura-green/40 bg-aura-green/5' : 'border-white/5'} text-center">
+                        <p class="text-[9px] font-black text-gray-400 uppercase">{r.courier}</p>
+                        <p class="text-xs font-black text-white mt-0.5">৳{r.total_cost || r.delivery_fee}</p>
+                        <p class="text-[8px] text-gray-500">{r.sla_hours?.min}-{r.sla_hours?.max} hrs</p>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Dispatch Authority Options -->
+          <div class="p-3 bg-black/40 border border-white/5 rounded-2xl space-y-2 text-xs">
+            <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">ডিসপ্যাচ অথরিটি (অ্যাকাউন্ট মোড)</span>
+            <div class="flex items-center gap-4 text-xs">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="byok_mode" checked={!auraUseVendorByok} onchange={() => auraUseVendorByok = false} class="accent-emerald-500" />
+                <span class="text-white font-bold">স্নেহলতা সেন্ট্রাল অ্যাকাউন্ট</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="byok_mode" checked={auraUseVendorByok} onchange={() => auraUseVendorByok = true} class="accent-emerald-500" />
+                <span class="text-gray-300">ভেন্ডরের কুরিয়ার (BYOK)</span>
+              </label>
+            </div>
+            <p class="text-[9px] text-gray-500">
+              {auraUseVendorByok ? 'ভেন্ডরের নিজস্ব API Key ও পিকআপ গুদাম ব্যবহার করে বুকিং হবে।' : 'স্নেহলতা প্ল্যাটফর্মের সেন্ট্রাল কুরিয়ার কি ব্যবহার করে বুকিং হবে।'}
+            </p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-3 pt-2">
+            <button
+              type="button"
+              onclick={() => auraDispatchModal = null}
+              class="flex-1 py-3 rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
+            >Cancel</button>
+            <button
+              type="button"
+              onclick={confirmAuraDispatch}
+              disabled={auraDispatchLoading}
+              class="flex-[2] py-3 rounded-xl bg-gradient-to-r from-aura-green via-emerald-500 to-aura-green text-black font-black uppercase tracking-widest text-xs hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {#if auraDispatchLoading}
+                <Loader2 size={14} class="animate-spin" />
+                <span>বুকিং হচ্ছে…</span>
+              {:else}
+                <Zap size={14} class="fill-current" />
+                <span>বুকিং নিশ্চিত করুন ({auraSelectedCourier.toUpperCase()})</span>
+              {/if}
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- ── Universal Live Tracking Modal ── -->
+    {#if auraTrackingModal}
+      <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" transition:fade={{ duration: 150 }}>
+        <div class="bg-[#0b120e] border border-aura-green/30 rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto space-y-5 shadow-[0_0_60px_rgba(16,185,129,0.15)] text-left relative" transition:scale={{ duration: 150, start: 0.95 }}>
+          <!-- Close Button -->
+          <button onclick={() => auraTrackingModal = null} class="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer">
+            <XCircle size={20} />
+          </button>
+
+          <!-- Tracking Header -->
+          <div>
+            <span class="px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-widest bg-aura-green/20 text-aura-green border border-aura-green/40">Universal Telemetry</span>
+            <h3 class="text-xl font-serif font-black text-white italic mt-1">লাইভ কুরিয়ার ট্র্যাকিং</h3>
+            <p class="text-xs font-mono text-aura-green mt-0.5">Tracking Code: {auraTrackingModal.code}</p>
+          </div>
+
+          {#if auraTrackingLoading}
+            <div class="py-12 text-center text-gray-500 text-xs flex items-center justify-center gap-2">
+              <Loader2 size={16} class="animate-spin text-aura-green" />
+              <span>কুরিয়ার সার্ভার থেকে লাইভ স্ট্যাটাস আনা হচ্ছে…</span>
+            </div>
+          {:else if auraTrackingModal.data}
+            {@const t = auraTrackingModal.data}
+            <div class="p-4 bg-black/50 border border-white/5 rounded-2xl space-y-3">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-400">Current Status:</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {t.status || 'IN_TRANSIT'}
+                </span>
+              </div>
+              {#if t.courier}
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-gray-400">Carrier Network:</span>
+                  <span class="text-white font-mono font-bold uppercase">{t.courier}</span>
+                </div>
+              {/if}
+              {#if t.current_location}
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-gray-400">Current Location:</span>
+                  <span class="text-white">{t.current_location}</span>
+                </div>
+              {/if}
+            </div>
+
+            <!-- Milestone Timeline -->
+            {#if t.timeline && t.timeline.length}
+              <div class="space-y-3 pt-2">
+                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">ডেলিভারি টাইমলাইন</p>
+                <div class="border-l-2 border-aura-green/30 ml-2 pl-4 space-y-4 text-xs">
+                  {#each t.timeline as ev}
+                    <div class="relative">
+                      <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-aura-green"></div>
+                      <p class="text-white font-bold">{ev.status}</p>
+                      <p class="text-[10px] text-gray-500 font-mono">{ev.timestamp}</p>
+                      {#if ev.note}<p class="text-[11px] text-gray-400 mt-0.5">{ev.note}</p>{/if}
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          {:else}
+            <div class="py-8 text-center text-gray-500 text-xs">
+              কুরিয়ার নেটওয়ার্কে এই ট্র্যাকিং কোডের কোনো সাম্প্রতিক মাইলস্টোন পাওয়া যায়নি।
+            </div>
+          {/if}
+
+          <div class="pt-2">
+            <button
+              type="button"
+              onclick={() => auraTrackingModal = null}
+              class="w-full py-2.5 rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
+            >Close</button>
           </div>
         </div>
       </div>

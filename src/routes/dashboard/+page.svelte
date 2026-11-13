@@ -38,6 +38,104 @@
       alert('Update failed: ' + (err?.message || 'error'));
     }
   }
+
+  // ── Vendor Courier & Pickup Hub Hub (Aura Courier MCP BYOK) ──
+  let showCourierModal = $state(false);
+  let courierHubLoading = $state(false);
+  let courierHubSaving = $state(false);
+  let courierHubMsg = $state<string | null>(null);
+  let vendorPickupHub = $state({ address: '', district: '', area: '', phone: '' });
+  let vendorCourierKeys = $state({
+    steadfast_api_key: '',
+    steadfast_secret_key: '',
+    pathao_client_id: '',
+    pathao_client_secret: '',
+    redx_api_token: '',
+    paperfly_api_key: ''
+  });
+  let vendorPreferredCourier = $state('steadfast');
+  let vendorShippingItemId = $state<number | null>(null);
+
+  async function openCourierSettingsModal() {
+    showCourierModal = true;
+    courierHubMsg = null;
+    courierHubLoading = true;
+    try {
+      const res = await fetch('/api/vendor/courier', {
+        headers: { Authorization: `Bearer ${vendorToken()}` }
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        vendorPickupHub = d.pickup_hub || { address: '', district: '', area: '', phone: '' };
+        vendorPreferredCourier = d.preferred_courier || 'steadfast';
+        if (d.key_hints) {
+          vendorCourierKeys = {
+            steadfast_api_key: d.key_hints.steadfast_api_key || '',
+            steadfast_secret_key: d.key_hints.steadfast_api_key ? '••••••••' : '',
+            pathao_client_id: d.key_hints.pathao_client_id || '',
+            pathao_client_secret: d.key_hints.pathao_client_id ? '••••••••' : '',
+            redx_api_token: d.key_hints.redx_api_token || '',
+            paperfly_api_key: d.key_hints.paperfly_api_key || ''
+          };
+        }
+      }
+    } catch {
+      // keep defaults
+    } finally {
+      courierHubLoading = false;
+    }
+  }
+
+  async function handleSaveCourierHub() {
+    courierHubSaving = true;
+    courierHubMsg = null;
+    try {
+      const res = await fetch('/api/vendor/courier', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${vendorToken()}`
+        },
+        body: JSON.stringify({
+          ...vendorPickupHub,
+          ...vendorCourierKeys,
+          preferred_courier: vendorPreferredCourier
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
+      courierHubMsg = d.message || 'সেটিংস সফলভাবে সংরক্ষিত হয়েছে!';
+      setTimeout(() => { if (courierHubMsg?.includes('সফল')) showCourierModal = false; }, 1500);
+    } catch (err: any) {
+      courierHubMsg = 'সংরক্ষণ ব্যর্থ: ' + (err?.message || 'error');
+    } finally {
+      courierHubSaving = false;
+    }
+  }
+
+  async function handleShipVendorOrder(itemId: number) {
+    if (vendorShippingItemId === itemId) return;
+    vendorShippingItemId = itemId;
+    try {
+      const res = await fetch('/api/vendor/orders/ship', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${vendorToken()}`
+        },
+        body: JSON.stringify({ itemId })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.message || `HTTP ${res.status}`);
+      alert(`আপনার নিজস্ব ${(d.courier || 'কুরিয়ারে').toUpperCase()} বুকিং সফল হয়েছে ✓\nTracking Code: ${d.tracking_code || d.consignment_id || 'ok'}`);
+      await loadVendorOrders();
+    } catch (err: any) {
+      alert('বুকিং ব্যর্থ: ' + (err?.message || 'error'));
+    } finally {
+      vendorShippingItemId = null;
+    }
+  }
+
   let showLogin = $state(false);
   let loginEmail = $state('');
   let loginPassword = $state('');
@@ -618,6 +716,173 @@
       </div>
     {/if}
 
+    <!-- ── Vendor Courier & Pickup Hub Hub (Aura Courier MCP BYOK) ── -->
+    {#if showCourierModal}
+      <div class="fixed inset-0 z-[130] flex items-center justify-center p-4 sm:p-6" transition:fade={{ duration: 200 }}>
+        <div class="absolute inset-0 bg-black/90 backdrop-blur-3xl" onclick={() => showCourierModal = false}></div>
+        <div class="relative bg-[#0d1410] border border-aura-green/30 rounded-[2.5rem] w-full max-w-lg p-6 sm:p-8 shadow-[0_0_60px_rgba(16,185,129,0.2)] max-h-[90vh] overflow-y-auto space-y-5" transition:scale={{ duration: 300 }}>
+          <button onclick={() => showCourierModal = false} class="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer">
+            <XCircle size={20} />
+          </button>
+
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-widest bg-aura-green/20 text-aura-green border border-aura-green/40">Aura Courier MCP · BYOK</span>
+            </div>
+            <h2 class="text-2xl font-serif font-black italic text-white">কুরিয়ার হাব ও পিকআপ সেটিংস</h2>
+            <p class="text-[11px] text-gray-400 mt-1">
+              আপনার নিজস্ব কুরিয়ার API Key কানেক্ট করে ১-ক্লিকে দোকান থেকেই পার্সেল ডিসপ্যাচ করুন। ক্যাশ অন ডেলিভারি (COD)-র টাকা সরাসরি আপনার কুরিয়ার একাউন্টে যাবে।
+            </p>
+          </div>
+
+          <!-- Section 1: Warehouse / Pickup Address -->
+          <div class="p-4 bg-black/40 border border-white/5 rounded-2xl space-y-3">
+            <span class="text-[10px] font-black uppercase tracking-widest text-aura-green flex items-center gap-1.5">
+              <span>📍 আপনার গুদাম / দোকানের পিকআপ ঠিকানা</span>
+            </span>
+            <input
+              type="text"
+              bind:value={vendorPickupHub.address}
+              placeholder="দোকান নং, হোল্ডিং, মার্কেট, রোড (যেমন: দোকান ২৮৭, মোতালেব প্লাজা)"
+              class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+            />
+            <div class="grid grid-cols-2 gap-3">
+              <input
+                type="text"
+                bind:value={vendorPickupHub.area}
+                placeholder="এলাকা / থানা (যেমন: হাতিরপুল)"
+                class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+              />
+              <input
+                type="text"
+                bind:value={vendorPickupHub.district}
+                placeholder="জেলা (যেমন: ঢাকা)"
+                class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+              />
+            </div>
+            <input
+              type="text"
+              bind:value={vendorPickupHub.phone}
+              placeholder="পিকআপ কন্টাক্ট মোবাইল (যেমন: 01846548010)"
+              class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+            />
+          </div>
+
+          <!-- Section 2: Courier API Credentials -->
+          <div class="space-y-4">
+            <span class="text-[10px] font-black uppercase tracking-widest text-gray-400 block">
+              কানেক্ট করুন আপনার নিজস্ব কুরিয়ার একাউন্ট (৪টি অপশন)
+            </span>
+
+            <!-- Steadfast -->
+            <div class="p-3.5 bg-white/5 border border-white/10 rounded-2xl space-y-2">
+              <p class="text-xs font-bold text-white flex items-center justify-between">
+                <span>🚚 Steadfast Courier</span>
+                <span class="text-[9px] text-gray-500 font-normal">portal.packzy.com</span>
+              </p>
+              <div class="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  bind:value={vendorCourierKeys.steadfast_api_key}
+                  placeholder="Api-Key"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[11px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+                <input
+                  type="password"
+                  bind:value={vendorCourierKeys.steadfast_secret_key}
+                  placeholder="Secret-Key"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[11px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+              </div>
+            </div>
+
+            <!-- Pathao Express -->
+            <div class="p-3.5 bg-white/5 border border-white/10 rounded-2xl space-y-2">
+              <p class="text-xs font-bold text-white flex items-center justify-between">
+                <span>⚡ Pathao Express</span>
+                <span class="text-[9px] text-gray-500 font-normal">merchant.pathao.com</span>
+              </p>
+              <div class="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  bind:value={vendorCourierKeys.pathao_client_id}
+                  placeholder="Client-ID"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[11px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+                <input
+                  type="password"
+                  bind:value={vendorCourierKeys.pathao_client_secret}
+                  placeholder="Client-Secret"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[11px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+              </div>
+            </div>
+
+            <!-- RedX & Paperfly (compact) -->
+            <div class="grid grid-cols-2 gap-2">
+              <div class="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
+                <p class="text-[11px] font-bold text-white">📦 RedX Delivery</p>
+                <input
+                  type="password"
+                  bind:value={vendorCourierKeys.redx_api_token}
+                  placeholder="API Token"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+              </div>
+              <div class="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
+                <p class="text-[11px] font-bold text-white">🦅 Paperfly Go</p>
+                <input
+                  type="password"
+                  bind:value={vendorCourierKeys.paperfly_api_key}
+                  placeholder="Paperfly Key"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+              </div>
+            </div>
+
+            <!-- Preferred Courier -->
+            <div class="flex items-center justify-between text-xs p-2.5 bg-black/30 rounded-xl border border-white/5">
+              <span class="text-gray-400 text-[10px] font-black uppercase tracking-widest">ডিফল্ট কুরিয়ার:</span>
+              <select bind:value={vendorPreferredCourier} class="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none">
+                <option value="steadfast">Steadfast Courier</option>
+                <option value="pathao">Pathao Express</option>
+                <option value="redx">RedX Delivery</option>
+                <option value="paperfly">Paperfly Go</option>
+              </select>
+            </div>
+          </div>
+
+          {#if courierHubMsg}
+            <p class="text-xs font-bold text-center {courierHubMsg.includes('সফল') ? 'text-green-400' : 'text-red-400'}">
+              {courierHubMsg}
+            </p>
+          {/if}
+
+          <!-- Modal Action -->
+          <div class="flex gap-3 pt-2">
+            <button
+              type="button"
+              onclick={() => showCourierModal = false}
+              class="flex-1 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-all cursor-pointer"
+            >Cancel</button>
+            <button
+              type="button"
+              onclick={handleSaveCourierHub}
+              disabled={courierHubSaving}
+              class="flex-[2] py-3.5 bg-aura-green text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:shadow-[0_0_25px_rgba(16,185,129,0.4)]"
+            >
+              {#if courierHubSaving}
+                <Loader2 size={14} class="animate-spin" />
+                <span>সংরক্ষণ হচ্ছে…</span>
+              {:else}
+                <span>💾 সেটিংস সংরক্ষণ করুন</span>
+              {/if}
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <header class="bg-black/50 backdrop-blur-3xl border-b border-white/5 py-12 px-6">
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
         <div>
@@ -634,8 +899,11 @@
             {/if}
           </div>
           <h1 class="text-4xl sm:text-6xl font-serif font-black italic tracking-tighter mb-2 break-words">{vendor.store_name}</h1>
-          <p class="text-gray-500 font-bold uppercase tracking-widest text-[10px] flex items-center gap-4">
-            {vendor.email} • Neural ID: {vendor.id}
+          <p class="text-gray-500 font-bold uppercase tracking-widest text-[10px] flex flex-wrap items-center gap-4">
+            <span>{vendor.email} • Neural ID: {vendor.id}</span>
+            <button onclick={openCourierSettingsModal} class="text-aura-gold hover:underline cursor-pointer font-black flex items-center gap-1">
+              <span>📦 কুরিয়ার হাব ও API কী (BYOK)</span>
+            </button>
             <button onclick={() => { showPwModal = true; pwMsg = null; }} class="text-aura-green hover:underline cursor-pointer">Change Password</button>
             <button onclick={handleLogout} class="text-red-500 hover:underline cursor-pointer">Switch Account</button>
           </p>
@@ -751,12 +1019,30 @@
                       <p class="text-green-400 font-black">৳{Number(it.vendor_payout).toLocaleString()}</p>
                       <p class="text-[8px] text-gray-500 uppercase tracking-widest">Your payout (−{it.commission_rate}%)</p>
                     </div>
-                    <select value={it.item_status} onchange={(e) => handleItemStatus(it.id, e.currentTarget.value)}
-                      class="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white outline-none cursor-pointer shrink-0">
-                      {#each ['PLACED', 'CONFIRMED', 'SHIPPED', 'DELIVERED'] as s}
-                        <option value={s} class="bg-black">{s}</option>
-                      {/each}
-                    </select>
+                    <div class="flex items-center gap-2 shrink-0">
+                      {#if !it.orders?.courier_tracking_code}
+                        <button
+                          type="button"
+                          onclick={() => handleShipVendorOrder(it.id)}
+                          disabled={vendorShippingItemId === it.id}
+                          class="px-3 py-2 rounded-xl bg-gradient-to-r from-aura-green/20 via-emerald-500/20 to-aura-green/20 border border-aura-green/40 text-aura-green text-[10px] font-black uppercase tracking-widest hover:bg-aura-green hover:text-black transition-all cursor-pointer whitespace-nowrap shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-1.5"
+                          title="আপনার নিজস্ব কুরিয়ার একাউন্ট দিয়ে পার্সেল বুক করুন"
+                        >
+                          <Zap size={11} class="fill-current" />
+                          <span>{vendorShippingItemId === it.id ? 'বুকিং…' : '🚀 Ship (My Courier)'}</span>
+                        </button>
+                      {:else}
+                        <span class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-mono font-bold whitespace-nowrap">
+                          🚚 {it.orders.courier_provider ? it.orders.courier_provider.toUpperCase() : 'SHIPPED'}
+                        </span>
+                      {/if}
+                      <select value={it.item_status} onchange={(e) => handleItemStatus(it.id, e.currentTarget.value)}
+                        class="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white outline-none cursor-pointer shrink-0">
+                        {#each ['PLACED', 'CONFIRMED', 'SHIPPED', 'DELIVERED'] as s}
+                          <option value={s} class="bg-black">{s}</option>
+                        {/each}
+                      </select>
+                    </div>
                   </div>
                 {/each}
               </div>

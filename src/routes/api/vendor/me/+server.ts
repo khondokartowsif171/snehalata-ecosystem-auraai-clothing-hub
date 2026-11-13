@@ -23,7 +23,7 @@ export const GET: RequestHandler = async ({ request }) => {
 
   const { data: vend } = await a
     .from('vendors')
-    .select('id, store_name, email, phone, status, website_url, vendor_type, category, commission_rate, fb_page_id, fb_page_name, fb_connected_at')
+    .select('id, store_name, email, phone, status, website_url, vendor_type, category, commission_rate, fb_page_id, fb_page_name, fb_connected_at, metadata')
     .eq('email', u.user.email)
     .single();
   if (!vend) throw error(403, 'No store linked to this account');
