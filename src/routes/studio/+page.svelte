@@ -151,8 +151,7 @@
   });
 
   /**
-   * Sample the center pixels of the selected product image on an offscreen canvas
-   * so the Free Neural Engine receives an accurate RGB/Hex color hint even for external URLs.
+   * Multi-cluster garment color & pattern profiler on client canvas (never averages black+white into grey).
    */
   async function sampleProductColorClient(imgUrl: string): Promise<string> {
     if (!browser || !imgUrl) return '';
@@ -164,29 +163,69 @@
         clearTimeout(timer);
         try {
           const c = document.createElement('canvas');
-          c.width = 24;
-          c.height = 24;
+          c.width = 32;
+          c.height = 32;
           const ctx = c.getContext('2d');
           if (!ctx) return resolve('');
-          const sx = img.naturalWidth * 0.25;
-          const sy = img.naturalHeight * 0.25;
-          const sw = Math.max(1, img.naturalWidth * 0.5);
-          const sh = Math.max(1, img.naturalHeight * 0.5);
-          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 24, 24);
-          const data = ctx.getImageData(0, 0, 24, 24).data;
-          let r = 0, g = 0, b = 0, count = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) continue;
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
-            count++;
+          const sx = img.naturalWidth * 0.22;
+          const sy = img.naturalHeight * 0.22;
+          const sw = Math.max(1, img.naturalWidth * 0.56);
+          const sh = Math.max(1, img.naturalHeight * 0.56);
+          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 32, 32);
+          const data = ctx.getImageData(0, 0, 32, 32).data;
+          const buckets: Record<string, number> = {};
+          let total = 0;
+          let edgeSum = 0;
+
+          const nameColor = (r: number, g: number, b: number) => {
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const l = (max + min) / 2 / 255;
+            const d = max - min;
+            const s = d === 0 ? 0 : d / (255 - Math.abs(2 * max - 255 - d));
+            if (l < 0.18) return 'Jet Black';
+            if (l > 0.80 && s < 0.22) return 'Crisp White';
+            if (s < 0.15) return l < 0.48 ? 'Charcoal Grey' : 'Light Silver Grey';
+            let h = 0;
+            if (d !== 0) {
+              if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+              else if (max === g) h = ((b - r) / d + 2) * 60;
+              else h = ((r - g) / d + 4) * 60;
+            }
+            if (h < 16 || h >= 345) return l < 0.38 ? 'Deep Maroon Burgundy' : 'Crimson Red';
+            if (h < 38) return l < 0.42 ? 'Rust Terracotta' : 'Coral Orange';
+            if (h < 65) return l < 0.46 ? 'Antique Gold Bronze' : 'Warm Mustard Gold';
+            if (h < 165) return l < 0.38 ? 'Deep Emerald Green' : 'Olive Sage Green';
+            if (h < 205) return 'Teal Ice Blue';
+            if (h < 255) return l < 0.36 ? 'Midnight Navy Blue' : 'Royal Sky Blue';
+            if (h < 295) return l < 0.38 ? 'Deep Wine Purple' : 'Lavender Violet';
+            return l < 0.42 ? 'Berry Magenta' : 'Soft Blush Pink';
+          };
+
+          for (let y = 0; y < 32; y++) {
+            for (let x = 0; x < 32; x++) {
+              // Skip center tag area
+              if (x > 12 && x < 20 && y > 10 && y < 19) continue;
+              const i = (y * 32 + x) * 4;
+              const r = data[i], g = data[i + 1], b = data[i + 2];
+              const bName = nameColor(r, g, b);
+              buckets[bName] = (buckets[bName] || 0) + 1;
+              total++;
+              if (x < 31) {
+                const ir = (y * 32 + x + 1) * 4;
+                edgeSum += Math.abs((r + g + b) / 3 - (data[ir] + data[ir + 1] + data[ir + 2]) / 3);
+              }
+            }
           }
-          if (!count) return resolve('');
-          const hex = '#' + [r / count, g / count, b / count]
-            .map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0'))
-            .join('');
-          resolve(hex);
+          if (!total) return resolve('');
+          const top = Object.entries(buckets)
+            .sort((a, b) => b[1] - a[1])
+            .filter(([, cnt]) => cnt / total >= 0.12)
+            .slice(0, 3)
+            .map(([k, cnt]) => `${k} (${Math.round((cnt / total) * 100)}%)`)
+            .join(' + ');
+          const avgEdge = edgeSum / total;
+          const pat = avgEdge > 24 ? 'high-contrast printed/striped pattern' : avgEdge > 12 ? 'textured/embroidered pattern' : 'solid fabric';
+          resolve(`${pat} in ${top}`);
         } catch {
           resolve('');
         }
