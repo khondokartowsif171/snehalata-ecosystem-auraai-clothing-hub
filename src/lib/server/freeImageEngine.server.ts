@@ -11,9 +11,17 @@ const SITE_ORIGIN = 'https://www.snehalata.com';
 const KONTEXT_SPACE = 'https://black-forest-labs-flux-1-kontext-dev.hf.space';
 const FLORENCE_SPACE = 'https://prithivmlmods-florence-2-image-caption.hf.space';
 const FASHN_VTON_SPACE = 'https://fashn-ai-fashn-vton-1-5.hf.space';
+const LEFFA_VTON_SPACE = 'https://franciszzj-leffa.hf.space';
+const CATVTON_SPACE = 'https://multimodalart-catvton-zerogpu.hf.space';
 const QWEN_EDIT_SPACE = 'https://linoyts-qwen-image-edit-2511-fast.hf.space';
 const SCHNELL_SPACE = 'https://black-forest-labs-flux-1-schnell.hf.space';
 const MERGED_SPACE = 'https://multimodalart-flux-1-merged.hf.space';
+
+// For banner photos where the model's arms/hands cross over the stomach/chest, map to their exact unobstructed studio hanger twin
+const UNOBSTRUCTED_HANGER_TWINS: Record<string, string> = {
+  'product-1783882975629-g00kfg.jpeg': '/products/tshirt-2.jpg',
+  'product-1783883079373-3kxi3i.jpeg': '/products/tshirt-1.jpg'
+};
 
 // Known flat-lay / hanger product photos (no human model wearing them)
 const FLAT_LAY_BASENAMES = new Set([
@@ -229,7 +237,9 @@ export async function prepareCleanGarmentBuffers(opts: {
   cleanZoomDataUrl: string;
   isModelPhoto: boolean;
 }> {
-  const basename = (opts.productImg.split('/').pop() || '').split('?')[0].toLowerCase();
+  const origBasename = (opts.productImg.split('/').pop() || '').split('?')[0].toLowerCase();
+  const effectiveRef = UNOBSTRUCTED_HANGER_TWINS[origBasename] || opts.productImg;
+  const basename = (effectiveRef.split('/').pop() || '').split('?')[0].toLowerCase();
   const rawCap = opts.rawVisionCaption || '';
   const catLower = (opts.category || '').toLowerCase();
 
@@ -239,7 +249,7 @@ export async function prepareCleanGarmentBuffers(opts: {
   }
 
   try {
-    const { buffer } = await resolveImageBuffer(opts.productImg);
+    const { buffer } = await resolveImageBuffer(effectiveRef);
     const sharpMod = await import('sharp').catch(() => null);
     if (!sharpMod?.default) {
       const b64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
@@ -258,9 +268,19 @@ export async function prepareCleanGarmentBuffers(opts: {
         rawCap
       );
 
-    // 1. Clean Portrait Buffer (removes left promotional text column so VTON/Multi-Image engines see ONLY the model/garment)
+    // 1. Clean Portrait Buffer (removes left promotional text column & corner badges so VTON/Multi-Image engines see ONLY the garment)
     let portraitBuf = buffer;
-    if (hasLeftBanner) {
+    if (/^tshirt-[1234]\.jpg$/i.test(basename)) {
+      portraitBuf = await sharp(buffer)
+        .extract({
+          left: Math.round(W * 0.38),
+          top: Math.round(H * 0.06),
+          width: Math.round(W * 0.56),
+          height: Math.round(H * 0.92)
+        })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+    } else if (hasLeftBanner) {
       const left = Math.round(W * 0.40);
       portraitBuf = await sharp(buffer)
         .extract({ left, top: 0, width: W - left, height: H })
@@ -776,6 +796,141 @@ export async function tryOnWithFashnVton(opts: {
 }
 
 /**
+ * True 2-Image Pixel-Exact Virtual Try-On via LEFFA VTON (franciszzj-leffa.hf.space).
+ */
+export async function tryOnWithLeffaVton(opts: {
+  userImg: string;
+  productImg: string;
+  category?: string;
+}): Promise<string | null> {
+  const catLower = (opts.category || '').toLowerCase();
+  let garmentType: 'upper_body' | 'lower_body' | 'dresses' = 'upper_body';
+  let modelType: 'viton_hd' | 'dress_code' = 'viton_hd';
+  if (/pant|trouser|jeans|salwar|pajama/i.test(catLower)) {
+    garmentType = 'lower_body';
+    modelType = 'dress_code';
+  } else if (/saree|shari|borka|abaya|three-?piece|kameez|dress|gown/i.test(catLower)) {
+    garmentType = 'dresses';
+    modelType = 'dress_code';
+  }
+
+  const uploadOne = async (ref: string, label: string) => {
+    const { buffer, mimeType, ext } = await resolveImageBuffer(ref);
+    const form = new FormData();
+    form.append('files', new Blob([new Uint8Array(buffer)], { type: mimeType }), `${label}.${ext}`);
+    const r = await fetch(`${LEFFA_VTON_SPACE}/gradio_api/upload`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!r.ok) throw new Error(`LEFFA upload failed (${r.status})`);
+    const j = await r.json();
+    return Array.isArray(j) ? j[0] : null;
+  };
+
+  const [pPath, gPath] = await Promise.all([
+    uploadOne(opts.userImg, 'person'),
+    uploadOne(opts.productImg, 'garment')
+  ]);
+  if (!pPath || !gPath) return null;
+
+  const callResp = await fetch(`${LEFFA_VTON_SPACE}/gradio_api/call/leffa_predict_vt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: [
+        { path: pPath, meta: { _type: 'gradio.FileData' } },
+        { path: gPath, meta: { _type: 'gradio.FileData' } },
+        true,
+        24,
+        2.5,
+        42,
+        modelType,
+        garmentType,
+        false
+      ]
+    }),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!callResp.ok) return null;
+  const { event_id } = await callResp.json();
+  if (!event_id) return null;
+
+  const sseResp = await fetch(`${LEFFA_VTON_SPACE}/gradio_api/call/leffa_predict_vt/${event_id}`, {
+    signal: AbortSignal.timeout(35000)
+  });
+  if (!sseResp.ok) return null;
+  return await readGradioSseAndFetchDataUrl(LEFFA_VTON_SPACE, sseResp);
+}
+
+/**
+ * True 2-Image Pixel-Exact Virtual Try-On via CatVTON-Flux (multimodalart-catvton-zerogpu.hf.space).
+ */
+export async function tryOnWithCatVtonFlux(opts: {
+  userImg: string;
+  productImg: string;
+  category?: string;
+}): Promise<string | null> {
+  const catLower = (opts.category || '').toLowerCase();
+  let clothType: 'upper' | 'lower' | 'overall' = 'upper';
+  if (/pant|trouser|jeans|salwar|pajama/i.test(catLower)) {
+    clothType = 'lower';
+  } else if (/saree|shari|borka|abaya|three-?piece|kameez|dress|gown/i.test(catLower)) {
+    clothType = 'overall';
+  }
+
+  const uploadOne = async (ref: string, label: string) => {
+    const { buffer, mimeType, ext } = await resolveImageBuffer(ref);
+    const form = new FormData();
+    form.append('files', new Blob([new Uint8Array(buffer)], { type: mimeType }), `${label}.${ext}`);
+    const r = await fetch(`${CATVTON_SPACE}/gradio_api/upload`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!r.ok) throw new Error(`CatVTON upload failed (${r.status})`);
+    const j = await r.json();
+    return Array.isArray(j) ? j[0] : null;
+  };
+
+  const [pPath, gPath] = await Promise.all([
+    uploadOne(opts.userImg, 'person'),
+    uploadOne(opts.productImg, 'garment')
+  ]);
+  if (!pPath || !gPath) return null;
+
+  const callResp = await fetch(`${CATVTON_SPACE}/gradio_api/call/submit_function_flux`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: [
+        {
+          background: { path: pPath, meta: { _type: 'gradio.FileData' } },
+          layers: [],
+          composite: null
+        },
+        { path: gPath, meta: { _type: 'gradio.FileData' } },
+        clothType,
+        28,
+        25,
+        42,
+        'result only'
+      ]
+    }),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!callResp.ok) return null;
+  const { event_id } = await callResp.json();
+  if (!event_id) return null;
+
+  const sseResp = await fetch(`${CATVTON_SPACE}/gradio_api/call/submit_function_flux/${event_id}`, {
+    signal: AbortSignal.timeout(35000)
+  });
+  if (!sseResp.ok) return null;
+  return await readGradioSseAndFetchDataUrl(CATVTON_SPACE, sseResp);
+}
+
+/**
  * True 2-Image Multi-Modal Garment Try-On via Qwen-Image-Edit-2511 (passes [userImg, productImg] together).
  */
 export async function tryOnWithQwenMultiImage(
@@ -972,7 +1127,31 @@ export async function tryOnGarmentFree(opts: {
     console.warn('[tryOnGarmentFree] FASHN VTON lane error:', e?.message);
   }
 
-  // Lane 2: True 2-Image Qwen-Image-Edit-2511 with [userImg, cleanPortraitDataUrl]
+  // Lane 2: True 2-Image LEFFA Virtual Try-On (franciszzj-leffa.hf.space)
+  try {
+    const leffaOut = await tryOnWithLeffaVton({
+      userImg: opts.userImg,
+      productImg: cleanGarments.cleanPortraitDataUrl,
+      category: cat
+    });
+    if (leffaOut) return leffaOut;
+  } catch (e: any) {
+    console.warn('[tryOnGarmentFree] LEFFA VTON lane error:', e?.message);
+  }
+
+  // Lane 3: True 2-Image CatVTON-Flux (multimodalart-catvton-zerogpu.hf.space)
+  try {
+    const catOut = await tryOnWithCatVtonFlux({
+      userImg: opts.userImg,
+      productImg: cleanGarments.cleanPortraitDataUrl,
+      category: cat
+    });
+    if (catOut) return catOut;
+  } catch (e: any) {
+    console.warn('[tryOnGarmentFree] CatVTON-Flux lane error:', e?.message);
+  }
+
+  // Lane 4: True 2-Image Qwen-Image-Edit-2511 with [userImg, cleanPortraitDataUrl]
   try {
     const qwenOut = await tryOnWithQwenMultiImage(opts.userImg, cleanGarments.cleanPortraitDataUrl, prompt);
     if (qwenOut) return qwenOut;
@@ -980,7 +1159,7 @@ export async function tryOnGarmentFree(opts: {
     console.warn('[tryOnGarmentFree] Qwen multi-image lane error:', e?.message);
   }
 
-  // Lane 3: FLUX.1 Kontext Dev with exact visual DNA / cleaned Florence-2 garment vision
+  // Lane 5: FLUX.1 Kontext Dev with exact visual DNA / cleaned Florence-2 garment vision
   try {
     const kontextOut = await editImageWithFluxKontext(opts.userImg, prompt, {
       guidanceScale: 2.5,
