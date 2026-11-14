@@ -94,11 +94,14 @@ export const POST: RequestHandler = async ({ request }) => {
     byokHeaders['x-steadfast-api-key'] = keys.steadfast_api_key;
     byokHeaders['x-steadfast-secret-key'] = keys.steadfast_secret_key;
   } else if (chosenCourier === 'pathao') {
-    if (!keys.pathao_client_id || !keys.pathao_client_secret) {
-      throw error(400, 'আপনার Pathao Client ID ও Secret সেট করা নেই। ড্যাশবোর্ডের কুরিয়ার সেটিংস থেকে আগে কি (Key) যোগ করুন।');
+    if (!keys.pathao_client_id || !keys.pathao_client_secret || !keys.pathao_username || !keys.pathao_password) {
+      throw error(400, 'আপনার Pathao Client ID, Secret, Merchant Email ও Password সেট করা নেই। ড্যাশবোর্ডের কুরিয়ার সেটিংস থেকে সম্পূর্ণ তথ্য যোগ করুন।');
     }
     byokHeaders['x-pathao-client-id'] = keys.pathao_client_id;
     byokHeaders['x-pathao-client-secret'] = keys.pathao_client_secret;
+    byokHeaders['x-pathao-username'] = keys.pathao_username;
+    byokHeaders['x-pathao-password'] = keys.pathao_password;
+    if (keys.pathao_store_id) byokHeaders['x-pathao-store-id'] = keys.pathao_store_id;
   } else if (chosenCourier === 'redx') {
     if (!keys.redx_api_token) {
       throw error(400, 'আপনার RedX API Token সেট করা নেই। ড্যাশবোর্ডের কুরিয়ার সেটিংস থেকে আগে টোকেন যোগ করুন।');
@@ -106,12 +109,13 @@ export const POST: RequestHandler = async ({ request }) => {
     byokHeaders['x-redx-api-token'] = keys.redx_api_token;
     if (keys.redx_store_id) byokHeaders['x-redx-pickup-store-id'] = keys.redx_store_id;
   } else if (chosenCourier === 'paperfly') {
-    if (!keys.paperfly_api_key) {
-      throw error(400, 'আপনার Paperfly API Key সেট করা নেই। ড্যাশবোর্ডের কুরিয়ার সেটিংস থেকে আগে কি (Key) যোগ করুন।');
+    if (!keys.paperfly_api_key || !keys.paperfly_username || !keys.paperfly_password) {
+      throw error(400, 'আপনার Paperfly API Key, Username ও Password সেট করা নেই। ড্যাশবোর্ডের কুরিয়ার সেটিংস থেকে ৩টি তথ্যই যোগ করুন।');
     }
     byokHeaders['x-paperfly-api-key'] = keys.paperfly_api_key;
-    if (keys.paperfly_username) byokHeaders['x-paperfly-username'] = keys.paperfly_username;
-    if (keys.paperfly_password) byokHeaders['x-paperfly-password'] = keys.paperfly_password;
+    byokHeaders['x-paperfly-username'] = keys.paperfly_username;
+    byokHeaders['x-paperfly-password'] = keys.paperfly_password;
+    byokHeaders['x-paperfly-store-name'] = vend.store_name || keys.paperfly_username || 'Merchant';
   } else {
     throw error(400, 'অসমর্থিত কুরিয়ার সার্ভিস নির্বাচন করা হয়েছে।');
   }

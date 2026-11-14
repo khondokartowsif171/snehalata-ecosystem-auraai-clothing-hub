@@ -71,11 +71,15 @@ export const POST: RequestHandler = async ({ request }) => {
       if (courierKeys.steadfast_secret_key) byokHeaders['x-steadfast-secret-key'] = courierKeys.steadfast_secret_key;
       if (courierKeys.pathao_client_id) byokHeaders['x-pathao-client-id'] = courierKeys.pathao_client_id;
       if (courierKeys.pathao_client_secret) byokHeaders['x-pathao-client-secret'] = courierKeys.pathao_client_secret;
+      if (courierKeys.pathao_username) byokHeaders['x-pathao-username'] = courierKeys.pathao_username;
+      if (courierKeys.pathao_password) byokHeaders['x-pathao-password'] = courierKeys.pathao_password;
+      if (courierKeys.pathao_store_id) byokHeaders['x-pathao-store-id'] = courierKeys.pathao_store_id;
       if (courierKeys.redx_api_token) byokHeaders['x-redx-api-token'] = courierKeys.redx_api_token;
       if (courierKeys.redx_store_id) byokHeaders['x-redx-pickup-store-id'] = courierKeys.redx_store_id;
       if (courierKeys.paperfly_api_key) byokHeaders['x-paperfly-api-key'] = courierKeys.paperfly_api_key;
       if (courierKeys.paperfly_username) byokHeaders['x-paperfly-username'] = courierKeys.paperfly_username;
       if (courierKeys.paperfly_password) byokHeaders['x-paperfly-password'] = courierKeys.paperfly_password;
+      if (courierKeys.paperfly_api_key) byokHeaders['x-paperfly-store-name'] = vend?.store_name || courierKeys.paperfly_username || 'Merchant';
 
       if (meta.pickup_hub?.address) {
         pickupAddressNote = ` [Pickup: ${meta.pickup_hub.address}, Phone: ${meta.pickup_hub.phone || ''}]`;

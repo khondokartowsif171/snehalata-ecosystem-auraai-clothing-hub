@@ -2039,12 +2039,12 @@
                 {#if auraRateData.recommendation_reason}
                   <p class="text-[10px] text-gray-400 italic">💡 {auraRateData.recommendation_reason}</p>
                 {/if}
-                {#if auraRateData.rates && auraRateData.rates.length}
+                {#if (auraRateData.rates || auraRateData.quotes)?.length}
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                    {#each auraRateData.rates as r}
+                    {#each (auraRateData.rates || auraRateData.quotes) as r}
                       <div class="p-2 rounded-lg bg-black/40 border {r.courier === auraRateData.recommended_courier ? 'border-aura-green/40 bg-aura-green/5' : 'border-white/5'} text-center">
                         <p class="text-[9px] font-black text-gray-400 uppercase">{r.courier}</p>
-                        <p class="text-xs font-black text-white mt-0.5">৳{r.total_cost || r.delivery_fee}</p>
+                        <p class="text-xs font-black text-white mt-0.5">৳{r.total_cost ?? r.base_delivery_fee ?? r.delivery_fee}</p>
                         <p class="text-[8px] text-gray-500">{r.sla_hours?.min}-{r.sla_hours?.max} hrs</p>
                       </div>
                     {/each}

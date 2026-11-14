@@ -64,7 +64,7 @@ export const GET: RequestHandler = async ({ request }) => {
     preferred_courier: meta.preferred_courier || 'steadfast',
     configured_couriers: {
       steadfast: Boolean(keys.steadfast_api_key && keys.steadfast_secret_key),
-      pathao: Boolean(keys.pathao_client_id && keys.pathao_client_secret),
+      pathao: Boolean(keys.pathao_client_id && keys.pathao_client_secret && keys.pathao_username && keys.pathao_password),
       redx: Boolean(keys.redx_api_token),
       paperfly: Boolean(keys.paperfly_api_key && keys.paperfly_username && keys.paperfly_password)
     },
@@ -72,6 +72,8 @@ export const GET: RequestHandler = async ({ request }) => {
     key_hints: {
       steadfast_api_key: keys.steadfast_api_key ? `***${keys.steadfast_api_key.slice(-4)}` : '',
       pathao_client_id: keys.pathao_client_id ? `***${keys.pathao_client_id.slice(-4)}` : '',
+      pathao_username: keys.pathao_username || '',
+      pathao_store_id: keys.pathao_store_id || '',
       redx_api_token: keys.redx_api_token ? `***${keys.redx_api_token.slice(-4)}` : '',
       redx_store_id: keys.redx_store_id || '',
       paperfly_api_key: keys.paperfly_api_key ? `***${keys.paperfly_api_key.slice(-4)}` : '',
@@ -94,14 +96,17 @@ export const POST: RequestHandler = async ({ request }) => {
   // Preserve existing keys if user leaves them blank or masked
   const newKeys = { ...existingKeys };
   if (b.steadfast_api_key && !b.steadfast_api_key.startsWith('***')) newKeys.steadfast_api_key = b.steadfast_api_key.trim();
-  if (b.steadfast_secret_key && !b.steadfast_secret_key.startsWith('***')) newKeys.steadfast_secret_key = b.steadfast_secret_key.trim();
+  if (b.steadfast_secret_key && !b.steadfast_secret_key.startsWith('***') && !b.steadfast_secret_key.startsWith('•••')) newKeys.steadfast_secret_key = b.steadfast_secret_key.trim();
   if (b.pathao_client_id && !b.pathao_client_id.startsWith('***')) newKeys.pathao_client_id = b.pathao_client_id.trim();
-  if (b.pathao_client_secret && !b.pathao_client_secret.startsWith('***')) newKeys.pathao_client_secret = b.pathao_client_secret.trim();
+  if (b.pathao_client_secret && !b.pathao_client_secret.startsWith('***') && !b.pathao_client_secret.startsWith('•••')) newKeys.pathao_client_secret = b.pathao_client_secret.trim();
+  if (b.pathao_username !== undefined) newKeys.pathao_username = String(b.pathao_username || '').trim();
+  if (b.pathao_password && !b.pathao_password.startsWith('•••') && !b.pathao_password.startsWith('***')) newKeys.pathao_password = b.pathao_password.trim();
+  if (b.pathao_store_id !== undefined) newKeys.pathao_store_id = String(b.pathao_store_id || '').trim();
   if (b.redx_api_token && !b.redx_api_token.startsWith('***')) newKeys.redx_api_token = b.redx_api_token.trim();
   if (b.redx_store_id !== undefined) newKeys.redx_store_id = String(b.redx_store_id || '').trim();
   if (b.paperfly_api_key && !b.paperfly_api_key.startsWith('***')) newKeys.paperfly_api_key = b.paperfly_api_key.trim();
   if (b.paperfly_username !== undefined) newKeys.paperfly_username = String(b.paperfly_username || '').trim();
-  if (b.paperfly_password && !b.paperfly_password.startsWith('•••')) newKeys.paperfly_password = b.paperfly_password.trim();
+  if (b.paperfly_password && !b.paperfly_password.startsWith('•••') && !b.paperfly_password.startsWith('***')) newKeys.paperfly_password = b.paperfly_password.trim();
 
   const pickup_hub = {
     address: String(b.address || existingMeta.pickup_hub?.address || '').trim(),

@@ -50,6 +50,9 @@
     steadfast_secret_key: '',
     pathao_client_id: '',
     pathao_client_secret: '',
+    pathao_username: '',
+    pathao_password: '',
+    pathao_store_id: '',
     redx_api_token: '',
     redx_store_id: '',
     paperfly_api_key: '',
@@ -93,6 +96,9 @@
             steadfast_secret_key: d.key_hints.steadfast_api_key ? '••••••••' : '',
             pathao_client_id: d.key_hints.pathao_client_id || '',
             pathao_client_secret: d.key_hints.pathao_client_id ? '••••••••' : '',
+            pathao_username: d.key_hints.pathao_username || '',
+            pathao_password: d.key_hints.pathao_username ? '••••••••' : '',
+            pathao_store_id: d.key_hints.pathao_store_id || '',
             redx_api_token: d.key_hints.redx_api_token || '',
             redx_store_id: d.key_hints.redx_store_id || '',
             paperfly_api_key: d.key_hints.paperfly_api_key || '',
@@ -843,6 +849,26 @@
                   bind:value={vendorCourierKeys.pathao_client_secret}
                   placeholder="Client-Secret"
                   class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[11px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <input
+                  type="email"
+                  bind:value={vendorCourierKeys.pathao_username}
+                  placeholder="Merchant Email"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+                <input
+                  type="password"
+                  bind:value={vendorCourierKeys.pathao_password}
+                  placeholder="Password"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+                <input
+                  type="text"
+                  bind:value={vendorCourierKeys.pathao_store_id}
+                  placeholder="Store ID"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
                 />
               </div>
             </div>

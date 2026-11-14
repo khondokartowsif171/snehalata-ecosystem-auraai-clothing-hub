@@ -120,8 +120,18 @@ export async function callAuraCourierTool<T = any>(
   if (!rawText) return result as T;
 
   try {
-    return JSON.parse(rawText) as T;
-  } catch {
+    const parsed = JSON.parse(rawText);
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.ok === false && parsed.error?.message) {
+        throw new Error(parsed.error.message);
+      }
+      if (parsed.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data)) {
+        return { ...parsed, ...parsed.data } as T;
+      }
+    }
+    return parsed as T;
+  } catch (err: any) {
+    if (err instanceof Error && !err.message.includes('JSON')) throw err;
     return rawText as unknown as T;
   }
 }
@@ -141,11 +151,23 @@ export async function compareRates(opts: {
   cod_amount: number;
   item_weight?: number;
 }): Promise<CourierRateComparison> {
-  return callAuraCourierTool<CourierRateComparison>('compare_courier_rates', {
+  const res = await callAuraCourierTool<any>('compare_courier_rates', {
     recipient_address: opts.recipient_address,
     cod_amount: opts.cod_amount,
-    item_weight: opts.item_weight ?? 0.5
+    weight_kg: opts.item_weight ?? 0.5
   });
+  if (res && typeof res === 'object' && Array.isArray(res.quotes) && !res.rates) {
+    res.rates = res.quotes.map((q: any) => ({
+      courier: q.courier,
+      courier_name: q.courier_name,
+      delivery_fee: q.base_delivery_fee ?? q.delivery_fee ?? 0,
+      cod_fee: q.cod_charge ?? q.cod_fee ?? 0,
+      total_cost: q.total_cost ?? q.base_delivery_fee ?? 0,
+      sla_hours: q.sla_hours || { min: 24, max: 48 },
+      is_available: true
+    }));
+  }
+  return res as CourierRateComparison;
 }
 
 function cleanBdPhone(raw: string): string {
