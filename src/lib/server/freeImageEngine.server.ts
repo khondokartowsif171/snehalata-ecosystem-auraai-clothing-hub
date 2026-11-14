@@ -33,22 +33,22 @@ const CATALOG_VISUAL_DNA: Record<string, string> = {
   'shirt-13.jpg': 'white casual button-down shirt with horizontal coral-pink and grey abstract tie-dye brush stroke bands across the shoulders, chest, and hem, dual chest flap pockets, and white rolled cuffs',
 
   // Local T-Shirts (/products/tshirt-1..3.jpg)
-  'tshirt-1.jpg': 'olive army green waffle-knit short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar edge and sleeve cuffs and an S emblem on the left chest',
-  'tshirt-2.jpg': 'deep dark bottle-green textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a small metallic gold S emblem on the left chest',
-  'tshirt-3.jpg': 'deep dark bottle-green textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a small metallic gold S emblem on the left chest',
+  'tshirt-1.jpg': 'olive army green waffle-knit short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with no fold-down lapels) featuring thin white contrast piping trim along the collar edge and short sleeve cuffs, a 2-button placket, and a minimalist S logo on the left chest',
+  'tshirt-2.jpg': 'deep dark bottle-green textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the top edge of the stand-up collar and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
+  'tshirt-3.jpg': 'deep dark bottle-green textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the top edge of the stand-up collar and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
 
   // 11 Live Supabase T-Shirts (#660 .. #670)
-  'product-1783882928184-b3qs2c.jpeg': 'deep dark forest-green textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and white S SNEHALATA logo on the left chest',
-  'product-1783882937577-dwe457.jpeg': 'deep midnight navy-blue textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and subtle S emblem on the left chest',
-  'product-1783882948427-1ha6yn.jpeg': 'olive army-green textured pique cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a gold S emblem on the left chest',
+  'product-1783882928184-b3qs2c.jpeg': 'deep dark forest-green textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with NO fold-down lapels) with thin crisp white contrast piping along the stand-up collar edge and short sleeve cuffs, a 2-button placket, and small white S SNEHALATA logo on the left chest',
+  'product-1783882937577-dwe457.jpeg': 'deep midnight navy-blue textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with NO fold-down lapels) with thin crisp white contrast piping along the stand-up collar edge and short sleeve cuffs, a 2-button placket, and subtle S logo on the left chest',
+  'product-1783882948427-1ha6yn.jpeg': 'olive army-green textured pique cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with NO fold-down lapels) with thin crisp white contrast piping along the stand-up collar edge and short sleeve cuffs, a 2-button placket, and a small gold letter S on the left chest',
   'product-1783882959037-3rtuok.jpeg': 'classic jet-black smooth cotton crew-neck short-sleeve minimalist t-shirt with a small white S SNEHALATA logo on the left chest',
-  'product-1783882966607-1hdkgd.jpeg': 'midnight navy-blue smooth cotton crew-neck short-sleeve t-shirt with crisp white SNEHALATA lettering across the center chest and a small white S emblem on the left chest',
-  'product-1783882975629-g00kfg.jpeg': 'deep dark bottle-green premium cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a small gold S emblem on the left chest',
-  'product-1783882984635-2woj1v.jpeg': 'jet-black premium cotton short-sleeve mandarin-collar polo t-shirt with warm gold/tan contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a gold S emblem on the left chest',
-  'product-1783883031751-2lzuqh.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small crisp white S emblem on the left chest',
-  'product-1783883079373-3kxi3i.jpeg': 'olive army-green premium cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a gold S emblem on the left chest',
-  'product-1783883087839-6n0m0y.jpeg': 'jet-black textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a white S emblem on the left chest',
-  'product-1783883097706-2kw083.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small white S emblem on the left chest',
+  'product-1783882966607-1hdkgd.jpeg': 'midnight navy-blue smooth cotton crew-neck short-sleeve t-shirt with crisp white SNEHALATA lettering across the center chest and a small white S logo on the left chest',
+  'product-1783882975629-g00kfg.jpeg': 'deep dark bottle-green premium cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring a single thin crisp white piping line along the stand-up collar rim and short sleeve cuffs, a 2-button placket with dark buttons, and a small minimalist gold letter S on the left chest',
+  'product-1783882984635-2woj1v.jpeg': 'jet-black premium cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin warm gold/tan contrast piping trim along the stand-up collar rim and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
+  'product-1783883031751-2lzuqh.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small crisp white letter S on the left chest',
+  'product-1783883079373-3kxi3i.jpeg': 'olive army-green premium cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the stand-up collar rim and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
+  'product-1783883087839-6n0m0y.jpeg': 'jet-black textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the stand-up collar rim and short sleeve cuffs, a 2-button placket, and a small white letter S on the left chest',
+  'product-1783883097706-2kw083.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small white letter S on the left chest',
 
   // Sarees (/products/saree-1..13.jpg)
   'saree-1.jpg': 'midnight navy blue handwoven Jamdani silk saree with antique copper-gold zari geometric border, red-and-gold floral buti motifs on the pallu, and matching navy blue blouse',
@@ -761,8 +761,8 @@ export async function tryOnGarmentFree(opts: {
   // Primary Lane: FLUX.1 Kontext Dev with exact visual DNA / cleaned Florence-2 garment vision
   try {
     const kontextOut = await editImageWithFluxKontext(opts.userImg, prompt, {
-      guidanceScale: 3.0,
-      steps: 28,
+      guidanceScale: 2.5,
+      steps: 26,
       preUploadedPath: uploadedUserPath || undefined
     });
     if (kontextOut) return kontextOut;
