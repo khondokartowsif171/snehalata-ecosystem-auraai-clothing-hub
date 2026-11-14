@@ -148,6 +148,13 @@ export async function compareRates(opts: {
   });
 }
 
+function cleanBdPhone(raw: string): string {
+  let digits = String(raw || '').replace(/[^0-9]/g, '');
+  if (digits.startsWith('880')) digits = digits.slice(2);
+  if (digits.length === 10 && digits.startsWith('1')) digits = '0' + digits;
+  return digits;
+}
+
 /**
  * 3. Book and dispatch a parcel consignment with optional BYOK headers
  */
@@ -158,7 +165,7 @@ export async function createParcel(opts: ParcelCreateOptions): Promise<ParcelCre
       courier: opts.courier || 'auto',
       invoice: opts.invoice,
       recipient_name: opts.recipient_name,
-      recipient_phone: opts.recipient_phone,
+      recipient_phone: cleanBdPhone(opts.recipient_phone),
       recipient_address: opts.recipient_address,
       cod_amount: opts.cod_amount,
       note: opts.note || '',
