@@ -6,7 +6,7 @@ import { tryOnGarmentFree } from '$lib/server/freeImageEngine.server';
 export const config = { maxDuration: 60 };
 
 export const POST = async ({ request }) => {
-  const { userImg, productImg, category, productName, productDescription, colorHint } = await request.json();
+  const { userImg, productImg, category, productName, productDescription, colorHint, preferEngine } = await request.json();
 
   if (!userImg || !productImg) {
     return json({
@@ -15,7 +15,7 @@ export const POST = async ({ request }) => {
     });
   }
 
-  // 1) Free Neural Engine (FLUX.1 Kontext Dev — 100% Free, Zero Quota Limits, Heritage & Modern Garment Aware)
+  // 1) Free Neural Engine (True 2-Image Garment Transfer + Vision-Grounded FLUX.1 Kontext Dev)
   try {
     const freeOut = await tryOnGarmentFree({
       userImg,
@@ -23,10 +23,11 @@ export const POST = async ({ request }) => {
       category,
       productName,
       productDescription,
-      colorHint
+      colorHint,
+      preferEngine
     });
     if (freeOut) {
-      return json({ image: freeOut, engine: 'flux-kontext-free' });
+      return json({ image: freeOut, engine: preferEngine || 'flux-kontext-free' });
     }
   } catch (e: any) {
     console.warn('[try-on] Free Kontext engine failed, trying secondary lanes:', e?.message);

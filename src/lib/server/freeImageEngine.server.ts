@@ -1,9 +1,10 @@
-// Free Neural Image & 2-Image Visual Try-On Engine for Snehalata Aura Studio
+// Free Neural Image & True 2-Image Visual Try-On Engine for Snehalata Aura Studio
 // Powered by Official Zero-Cost Gradio Spaces:
-// 1. FLUX.1 Kontext Dev (black-forest-labs-flux-1-kontext-dev.hf.space) — In-Context Virtual Try-On, Makeup, Style Transfer & Image Remix
-// 2. Florence-2 Large Vision Analyzer (prithivmlmods-florence-2-image-caption.hf.space) — Real-time Visual Garment Inspection (Pattern, Print, Collar, Cuffs & Cut)
-// 3. FASHN VTON 1.5 (fashn-ai-fashn-vton-1-5.hf.space) & Qwen-Image-Edit-2511 (linoyts-qwen-image-edit-2511-fast.hf.space) — 2-Image Garment Transfer
-// 4. FLUX.1 Schnell & FLUX.1 Merged HD — 100% Free Text-to-Image Generation
+// 1. FLUX.1 Kontext Dev 2-Panel Diptych & In-Context Try-On (black-forest-labs-flux-1-kontext-dev.hf.space)
+// 2. FASHN VTON 1.5 (fashn-ai-fashn-vton-1-5.hf.space) — Dedicated 2-Image Pixel-Exact Virtual Try-On
+// 3. Qwen-Image-Edit-2511 (linoyts-qwen-image-edit-2511-fast.hf.space) — Multi-Image [Person, Garment] Editor
+// 4. Florence-2 Large Vision Analyzer (prithivmlmods-florence-2-image-caption.hf.space) — Real-time Visual Garment Inspection
+// 5. FLUX.1 Schnell & FLUX.1 Merged HD — 100% Free Text-to-Image Generation
 
 const SITE_ORIGIN = 'https://www.snehalata.com';
 
@@ -14,11 +15,33 @@ const QWEN_EDIT_SPACE = 'https://linoyts-qwen-image-edit-2511-fast.hf.space';
 const SCHNELL_SPACE = 'https://black-forest-labs-flux-1-schnell.hf.space';
 const MERGED_SPACE = 'https://multimodalart-flux-1-merged.hf.space';
 
+// Known flat-lay / hanger product photos (no human model wearing them)
+const FLAT_LAY_BASENAMES = new Set([
+  'shirt-1.jpg', 'shirt-2.jpg', 'shirt-3.jpg', 'shirt-4.jpg', 'shirt-5.jpg',
+  'shirt-6.jpg', 'shirt-7.jpg', 'shirt-8.jpg', 'shirt-9.jpg', 'shirt-10.jpg',
+  'shirt-11.jpg', 'shirt-12.jpg', 'shirt-13.jpg',
+  'tshirt-1.jpg', 'tshirt-2.jpg', 'tshirt-3.jpg', 'tshirt-4.jpg', 'tshirt-5.jpg',
+  'pant-1.jpg', 'pant-2.jpg'
+]);
+
+// Known square (1:1) promotional banners where the left ~40% is ad text and the right ~60% is the model/garment
+const LEFT_BANNER_BASENAMES = new Set([
+  'product-1783882975629-g00kfg.jpeg',
+  'product-1783882984635-2woj1v.jpeg',
+  'product-1783883031751-2lzuqh.jpeg',
+  'product-1783883079373-3kxi3i.jpeg',
+  'product-1783883097706-2kw083.jpeg',
+  'borka-161.jpg', 'borka-162.jpg', 'borka-163.jpg', 'borka-164.jpg',
+  'panjabi-kuthir-1.jpg', 'panjabi-kuthir-2.jpg', 'panjabi-kuthir-3.jpg', 'panjabi-kuthir-4.jpg', 'panjabi-kuthir-5.jpg',
+  'tshirt-1.jpg', 'tshirt-2.jpg', 'tshirt-3.jpg', 'tshirt-4.jpg',
+  'shirt-1.jpg', 'shirt-2.jpg', 'shirt-3.jpg', 'shirt-4.jpg', 'shirt-5.jpg'
+]);
+
 // Exact Visual DNA signatures for showcase & Supabase catalog items (keyed by filename)
 // Ensures 100% pixel-faithful garment reproduction even when DB titles are generic or mismatched.
 const CATALOG_VISUAL_DNA: Record<string, string> = {
   // 13 Showcase Shirts (/products/shirt-1.jpg .. shirt-13.jpg)
-  'shirt-1.jpg': 'solid deep burgundy maroon premium cotton formal long-sleeve button-down shirt with classic collar, dark maroon buttons, and a small gold chest emblem',
+  'shirt-1.jpg': 'solid deep burgundy maroon premium cotton formal long-sleeve button-down shirt with classic collar, dark maroon buttons, and a small standalone gold letter S on the left chest',
   'shirt-2.jpg': 'solid dark midnight navy blue textured cotton formal long-sleeve button-down shirt with classic collar and matching dark buttons',
   'shirt-3.jpg': 'solid olive sage green textured cotton formal long-sleeve button-down shirt with classic collar and dark buttons',
   'shirt-4.jpg': 'solid warm cream ivory beige textured cotton formal long-sleeve button-down shirt with classic collar and light buttons',
@@ -33,22 +56,22 @@ const CATALOG_VISUAL_DNA: Record<string, string> = {
   'shirt-13.jpg': 'white casual button-down shirt with horizontal coral-pink and grey abstract tie-dye brush stroke bands across the shoulders, chest, and hem, dual chest flap pockets, and white rolled cuffs',
 
   // Local T-Shirts (/products/tshirt-1..3.jpg)
-  'tshirt-1.jpg': 'olive army green waffle-knit short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with no fold-down lapels) featuring thin white contrast piping trim along the collar edge and short sleeve cuffs, a 2-button placket, and a minimalist S logo on the left chest',
-  'tshirt-2.jpg': 'deep dark bottle-green textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the top edge of the stand-up collar and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
-  'tshirt-3.jpg': 'deep dark bottle-green textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the top edge of the stand-up collar and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
+  'tshirt-1.jpg': 'solid olive army-green smooth cotton short-sleeve Henley t-shirt with a short upright collarless Chinese band neckband (NO fold-down collar flaps, NO lapels) edged with a single thin white piping line along the top rim, a V-notch placket with 2 small dark olive-black buttons (NO white buttons), short sleeves with a single thin white edge line on the cuff hem (NO double stripes), and a small plain standalone letter S on the left chest (NO circle, wreath, or crest around the S)',
+  'tshirt-2.jpg': 'solid deep dark bottle-green smooth cotton short-sleeve Henley t-shirt with a short upright collarless Chinese band neckband (NO fold-down collar flaps, NO lapels) edged with a single thin white piping line along the top rim, a V-notch placket with 2 small dark green-black buttons (NO white buttons), short sleeves with a single thin white edge line on the cuff hem (NO double stripes), and a small plain standalone letter S on the left chest (NO circle, wreath, or crest around the S)',
+  'tshirt-3.jpg': 'solid deep dark bottle-green smooth cotton short-sleeve Henley t-shirt with a short upright collarless Chinese band neckband (NO fold-down collar flaps, NO lapels) edged with a single thin white piping line along the top rim, a V-notch placket with 2 small dark green-black buttons (NO white buttons), short sleeves with a single thin white edge line on the cuff hem (NO double stripes), and a small plain standalone letter S on the left chest (NO circle, wreath, or crest around the S)',
 
   // 11 Live Supabase T-Shirts (#660 .. #670)
-  'product-1783882928184-b3qs2c.jpeg': 'deep dark forest-green textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with NO fold-down lapels) with thin crisp white contrast piping along the stand-up collar edge and short sleeve cuffs, a 2-button placket, and small white S SNEHALATA logo on the left chest',
-  'product-1783882937577-dwe457.jpeg': 'deep midnight navy-blue textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with NO fold-down lapels) with thin crisp white contrast piping along the stand-up collar edge and short sleeve cuffs, a 2-button placket, and subtle S logo on the left chest',
-  'product-1783882948427-1ha6yn.jpeg': 'olive army-green textured pique cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese band collar with NO fold-down lapels) with thin crisp white contrast piping along the stand-up collar edge and short sleeve cuffs, a 2-button placket, and a small gold letter S on the left chest',
-  'product-1783882959037-3rtuok.jpeg': 'classic jet-black smooth cotton crew-neck short-sleeve minimalist t-shirt with a small white S SNEHALATA logo on the left chest',
-  'product-1783882966607-1hdkgd.jpeg': 'midnight navy-blue smooth cotton crew-neck short-sleeve t-shirt with crisp white SNEHALATA lettering across the center chest and a small white S logo on the left chest',
-  'product-1783882975629-g00kfg.jpeg': 'deep dark bottle-green premium cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring a single thin crisp white piping line along the stand-up collar rim and short sleeve cuffs, a 2-button placket with dark buttons, and a small minimalist gold letter S on the left chest',
-  'product-1783882984635-2woj1v.jpeg': 'jet-black premium cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin warm gold/tan contrast piping trim along the stand-up collar rim and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
-  'product-1783883031751-2lzuqh.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small crisp white letter S on the left chest',
-  'product-1783883079373-3kxi3i.jpeg': 'olive army-green premium cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the stand-up collar rim and short sleeve cuffs, a 2-button placket, and a small minimalist gold letter S on the left chest',
-  'product-1783883087839-6n0m0y.jpeg': 'jet-black textured cotton short-sleeve stand-up mandarin band-collar Henley t-shirt (Chinese stand-up band collar with NO fold-down lapels) featuring thin crisp white contrast piping trim along the stand-up collar rim and short sleeve cuffs, a 2-button placket, and a small white letter S on the left chest',
-  'product-1783883097706-2kw083.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small white letter S on the left chest',
+  'product-1783882928184-b3qs2c.jpeg': 'solid deep dark forest-green smooth cotton short-sleeve Henley t-shirt with a short upright collarless Chinese band neckband (NO fold-down collar flaps, NO lapels) edged with a single thin white piping line along the top rim, a 2-button placket with small dark buttons (NO white buttons), short sleeves with a single thin white edge line on the cuff hem (NO double stripes), and a small plain white letter S on the left chest (NO circle or crest)',
+  'product-1783882937577-dwe457.jpeg': 'solid deep midnight navy-blue smooth cotton short-sleeve Henley t-shirt with a short upright collarless Chinese band neckband (NO fold-down collar flaps, NO lapels) edged with a single thin white piping line along the top rim, a 2-button placket with small dark buttons, short sleeves with a single thin white edge line on the cuff hem, and a small plain letter S on the left chest (NO circle or crest)',
+  'product-1783882948427-1ha6yn.jpeg': 'solid olive army-green textured pique cotton short-sleeve Henley t-shirt with a short upright collarless Chinese band neckband (NO fold-down collar flaps, NO lapels) edged with a single thin white piping line along the top rim, a 2-button placket with small dark buttons, short sleeves with a single thin white edge line on the cuff hem, and a small plain gold letter S on the left chest (NO circle or crest)',
+  'product-1783882959037-3rtuok.jpeg': 'classic jet-black smooth cotton crew-neck short-sleeve minimalist t-shirt with a small plain white S SNEHALATA text logo on the left chest (NO crest)',
+  'product-1783882966607-1hdkgd.jpeg': 'midnight navy-blue smooth cotton crew-neck short-sleeve t-shirt with crisp white SNEHALATA lettering across the center chest and a small white letter S on the left chest',
+  'product-1783882975629-g00kfg.jpeg': 'solid deep dark bottle-green smooth cotton short-sleeve Henley t-shirt featuring a short upright collarless Chinese mandarin band neckband (strictly a flat upright band around the neck with a small V-notch opening at the throat — NO fold-down collar flaps and NO lapels) edged with a single thin crisp white line along the top rim of the neckband, a placket with 2 small dark green-black buttons (NO white buttons), short sleeves with a single thin crisp white line along the bottom edge of each cuff (NO double stripes), and a small plain standalone beige-gold outlined letter S on the left chest (strictly just the single letter S with NO circle, NO wreath, and NO crest around it)',
+  'product-1783882984635-2woj1v.jpeg': 'solid jet-black smooth cotton short-sleeve Henley t-shirt featuring a short upright collarless Chinese mandarin band neckband (strictly a flat upright band around the neck with NO fold-down collar flaps) edged with a single thin warm gold/tan piping line along the top rim, a placket with 2 small black buttons, short sleeves with a single thin gold/tan line on the cuff edge, and a small plain standalone gold letter S on the left chest (NO circle or crest around the S)',
+  'product-1783883031751-2lzuqh.jpeg': 'classic jet-black smooth cotton crew-neck short-sleeve t-shirt with a small plain standalone white letter S on the left chest (NO circle or crest)',
+  'product-1783883079373-3kxi3i.jpeg': 'solid olive army-green smooth cotton short-sleeve Henley t-shirt featuring a short upright collarless Chinese mandarin band neckband (NO fold-down collar flaps) edged with a single thin crisp white line along the top rim, a placket with 2 small dark buttons, short sleeves with a single thin white line on the cuff edge, and a small plain standalone beige-gold letter S on the left chest (NO circle or crest)',
+  'product-1783883087839-6n0m0y.jpeg': 'solid jet-black smooth cotton short-sleeve Henley t-shirt featuring a short upright collarless Chinese mandarin band neckband (NO fold-down collar flaps) edged with a single thin crisp white line along the top rim, a placket with 2 small black buttons, short sleeves with a single thin white line on the cuff edge, and a small plain standalone white letter S on the left chest (NO circle or crest)',
+  'product-1783883097706-2kw083.jpeg': 'classic jet-black smooth cotton crew-neck short-sleeve t-shirt with a small plain standalone white letter S on the left chest (NO circle or crest)',
 
   // Sarees (/products/saree-1..13.jpg)
   'saree-1.jpg': 'midnight navy blue handwoven Jamdani silk saree with antique copper-gold zari geometric border, red-and-gold floral buti motifs on the pallu, and matching navy blue blouse',
@@ -194,6 +217,88 @@ export async function resolveImageBuffer(ref: string): Promise<{ buffer: Buffer;
 }
 
 /**
+ * Automatically crop out promotional ad banners (left sidebar text on Snehalata/vendor banners)
+ * and generate both a clean portrait garment buffer AND a close-up neck-down garment zoom buffer.
+ */
+export async function prepareCleanGarmentBuffers(opts: {
+  productImg: string;
+  rawVisionCaption?: string;
+  category?: string;
+}): Promise<{
+  cleanPortraitDataUrl: string;
+  cleanZoomDataUrl: string;
+  isModelPhoto: boolean;
+}> {
+  const basename = (opts.productImg.split('/').pop() || '').split('?')[0].toLowerCase();
+  const rawCap = opts.rawVisionCaption || '';
+  const catLower = (opts.category || '').toLowerCase();
+
+  let isModelPhoto = !FLAT_LAY_BASENAMES.has(basename);
+  if (!CATALOG_VISUAL_DNA[basename] && rawCap) {
+    isModelPhoto = /\b(man|woman|person|boy|girl|model|wearing|standing|sitting|smiling)\b/i.test(rawCap);
+  }
+
+  try {
+    const { buffer } = await resolveImageBuffer(opts.productImg);
+    const sharpMod = await import('sharp').catch(() => null);
+    if (!sharpMod?.default) {
+      const b64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+      return { cleanPortraitDataUrl: b64, cleanZoomDataUrl: b64, isModelPhoto };
+    }
+
+    const sharp = sharpMod.default;
+    const meta = await sharp(buffer).metadata();
+    const W = meta.width || 1024;
+    const H = meta.height || 1024;
+
+    const hasLeftBanner =
+      LEFT_BANNER_BASENAMES.has(basename) ||
+      W > H * 1.12 ||
+      /\b(right side of the image|left side of the image, there is text|text that reads|neural verified|collection|shop now|vendor|porda|kuthir|craftsmanship)\b/i.test(
+        rawCap
+      );
+
+    // 1. Clean Portrait Buffer (removes left promotional text column so VTON/Multi-Image engines see ONLY the model/garment)
+    let portraitBuf = buffer;
+    if (hasLeftBanner) {
+      const left = Math.round(W * 0.40);
+      portraitBuf = await sharp(buffer)
+        .extract({ left, top: 0, width: W - left, height: H })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+    }
+
+    // 2. Clean Neck-Down Garment Zoom Buffer (crops out the reference model's face AND ad banner for top/shirt/t-shirt/panjabi diptych)
+    let zoomBuf = portraitBuf;
+    const isUpperGarment = !/saree|shari|borka|abaya|three-?piece|kameez|pant|trouser|jeans/i.test(catLower);
+    if (isModelPhoto && isUpperGarment) {
+      const left = hasLeftBanner ? Math.round(W * 0.43) : Math.round(W * 0.12);
+      const width = hasLeftBanner ? Math.round(W * 0.46) : Math.round(W * 0.76);
+      const top = Math.round(H * 0.22);
+      const height = Math.round(H * 0.76);
+      if (left + width <= W && top + height <= H) {
+        zoomBuf = await sharp(buffer)
+          .extract({ left, top, width, height })
+          .jpeg({ quality: 92 })
+          .toBuffer();
+      }
+    }
+
+    return {
+      cleanPortraitDataUrl: `data:image/jpeg;base64,${portraitBuf.toString('base64')}`,
+      cleanZoomDataUrl: `data:image/jpeg;base64,${zoomBuf.toString('base64')}`,
+      isModelPhoto
+    };
+  } catch {
+    return {
+      cleanPortraitDataUrl: opts.productImg,
+      cleanZoomDataUrl: opts.productImg,
+      isModelPhoto
+    };
+  }
+}
+
+/**
  * Classify a single RGB pixel into a named fashion color bucket (never averaging black+white into grey).
  */
 function classifyPixelBucket(r: number, g: number, b: number): string {
@@ -226,7 +331,7 @@ function classifyPixelBucket(r: number, g: number, b: number): string {
 
 /**
  * Multi-Cluster Spatial Color & Pattern Analyzer for Flat-Lay Garments.
- * IMPORTANT: Never runs raw pixel-box sampling on model/banner photos (where background rooms/screens would pollute colors).
+ * Never runs raw pixel-box sampling on model/banner photos (where background rooms/screens would pollute colors).
  */
 export async function analyzeGarmentVisualStructure(
   imageRef: string,
@@ -238,8 +343,6 @@ export async function analyzeGarmentVisualStructure(
     return CATALOG_VISUAL_DNA[basename];
   }
 
-  // If Florence-2 vision detected a human model or ad banner text, or if the product title already names an explicit color,
-  // do NOT run the raw pixel-box sampler (which would sample background walls, chandeliers, or skin tones).
   const isModelOrBannerPhoto =
     /\b(man|woman|person|boy|girl|model|standing|sitting|smiling|wearing|text that reads|collection|shop now|chandelier|room)\b/i.test(
       visionCaption
@@ -273,7 +376,6 @@ export async function analyzeGarmentVisualStructure(
     let vertGradSum = 0;
     let gradCount = 0;
 
-    // Sample only the tight center garment fabric region (x: 30%..70%, y: 35%..75%), skipping neck tag box
     for (let y = Math.floor(H * 0.35); y < Math.floor(H * 0.75); y++) {
       for (let x = Math.floor(W * 0.3); x < Math.floor(W * 0.7); x++) {
         if (x > W * 0.42 && x < W * 0.58 && y > H * 0.35 && y < H * 0.52) continue;
@@ -359,7 +461,7 @@ function extractGradioCompleteJson(sseText: string): any {
 
 /**
  * Inspect the actual product image visually using Florence-2-Large Vision.
- * Preserves the exact sentence describing what garment the model is wearing or what is on the hanger!
+ * For new vendor images that are wide banners, automatically crops off the left ad text first so Florence-2 focuses 100% on the garment!
  */
 export async function describeGarmentImageVisually(productImgRef: string): Promise<{
   cleanGarmentCaption: string;
@@ -376,7 +478,27 @@ export async function describeGarmentImageVisually(productImgRef: string): Promi
   }
 
   try {
-    const { buffer, mimeType, ext } = await resolveImageBuffer(productImgRef);
+    let { buffer, mimeType, ext } = await resolveImageBuffer(productImgRef);
+    // If a new vendor uploaded a wide promotional banner, crop the right 62% so Florence-2 inspects the garment closely
+    try {
+      const sharpMod = await import('sharp').catch(() => null);
+      if (sharpMod?.default) {
+        const sharp = sharpMod.default;
+        const meta = await sharp(buffer).metadata();
+        if (meta.width && meta.height && meta.width > meta.height * 1.15) {
+          const left = Math.round(meta.width * 0.38);
+          buffer = await sharp(buffer)
+            .extract({ left, top: 0, width: meta.width - left, height: meta.height })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+          mimeType = 'image/jpeg';
+          ext = 'jpg';
+        }
+      }
+    } catch {
+      // keep original buffer
+    }
+
     const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
     const form = new FormData();
     form.append('files', blob, `garment.${ext}`);
@@ -412,7 +534,6 @@ export async function describeGarmentImageVisually(productImgRef: string): Promi
     const rawCaption = typeof parsed?.[0] === 'string' ? parsed[0].trim() : '';
     if (!rawCaption) return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
 
-    // Cleanly extract ONLY the wearable garment sentences without deleting "standing/wearing" sentences!
     const sentences = rawCaption
       .replace(/hanging on a [a-z\s]*hanger/gi, '')
       .replace(/on a [a-z\s]*hanger/gi, '')
@@ -421,7 +542,6 @@ export async function describeGarmentImageVisually(productImgRef: string): Promi
       .filter(Boolean)
       .map((s) =>
         s
-          // Strip leading "The image shows a young man standing in a luxurious room with a chandelier in the background" ONLY if it doesn't contain "wearing"
           .replace(/^The image shows (?:a|an) [^.]*?\b(?:wearing|dressed in)\s+/i, '')
           .replace(/^(?:He|She|The man|The woman|The model|The person) is (?:wearing|dressed in)\s+/i, '')
       )
@@ -444,7 +564,7 @@ export async function describeGarmentImageVisually(productImgRef: string): Promi
 
 /**
  * Build a 100% deterministic, image-first garment replacement instruction.
- * Never allows a mismatched DB title or background-room color to override the actual visual garment!
+ * Notice: NEVER injects the word "polo" on T-shirts/Henleys so stand-up Chinese band collars stay 100% collarless/unfolded!
  */
 function buildExactTryOnPrompt(opts: {
   category: string;
@@ -459,7 +579,7 @@ function buildExactTryOnPrompt(opts: {
 
   let removalClause =
     "Completely replace the person's current clothing (removing any suit jacket, blazer, coat, or previous top)";
-  let fitClause = 'fitted naturally with realistic fabric folds, collar, sleeves, and studio lighting';
+  let fitClause = 'fitted naturally with realistic fabric folds, neckline, sleeves, and studio lighting';
 
   if (/saree|shari/i.test(catLower)) {
     fitClause =
@@ -472,9 +592,9 @@ function buildExactTryOnPrompt(opts: {
   } else if (/three-?piece|kameez/i.test(catLower)) {
     fitClause =
       'styled as a Bangladeshi embroidered three-piece salwar kameez tunic with matching trousers and draped dupatta scarf';
-  } else if (/t-?shirt|polo/i.test(catLower)) {
+  } else if (/t-?shirt/i.test(catLower)) {
     fitClause =
-      'worn as a standalone short-sleeve shirt/polo on the torso with bare forearms visible (completely remove any suit jacket, blazer, or long-sleeve outer coat)';
+      'worn as a standalone short-sleeve t-shirt on the torso with bare forearms visible (completely remove any suit jacket, blazer, or long-sleeve outer coat)';
   } else if (/shirt/i.test(catLower)) {
     fitClause =
       'worn as a standalone button-down shirt with visible collar, buttons, full pattern across the chest and sleeves, and cuffs (completely remove any suit jacket, blazer, or outer coat)';
@@ -483,13 +603,10 @@ function buildExactTryOnPrompt(opts: {
     fitClause = 'tailored naturally on the lower body with realistic denim/cotton folds';
   }
 
-  // If we have an exact human-verified visual DNA signature for this image filename, use it as the sole ground truth
-  // (preventing mismatched database titles like "Casual Check Shirt" on solid navy shirt-2.jpg from confusing the model).
   if (isCatalogExactMatch && visualStructure) {
     return `${removalClause} so they are wearing ONLY this exact garment: ${visualStructure}. Styled ${fitClause}. Keep the person's exact face, facial expression, beard, hairstyle, skin tone, pose, and background 100% identical and unchanged.`;
   }
 
-  // Otherwise, combine BOTH the translated product title AND the cleaned Florence-2 visual garment caption
   const parts = [
     cleanName ? `${cleanName} (${category})` : category,
     visionCaption ? `Visual details from product photo: ${visionCaption}` : '',
@@ -522,6 +639,72 @@ async function readGradioSseAndFetchDataUrl(baseSpaceUrl: string, sseResp: Respo
   const mime = (imgResp.headers.get('content-type') || 'image/webp').split(';')[0].trim();
   const buf = Buffer.from(await imgResp.arrayBuffer());
   return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
+/**
+ * True 2-Image Side-by-Side Diptych Garment Transfer via FLUX.1 Kontext Dev.
+ * Stitches [Left: Customer Photo (512x768) | Right: Clean Garment Reference (512x768)] into a 1024x768 diptych,
+ * instructs FLUX.1 Kontext Dev to dress the left person in the exact garment from the right panel,
+ * and crops back the left panel!
+ */
+export async function tryOnWithKontextDiptych(opts: {
+  userImg: string;
+  cleanGarmentRef: string;
+  garmentDetailsPrompt: string;
+}): Promise<string | null> {
+  const sharpMod = await import('sharp').catch(() => null);
+  if (!sharpMod?.default) return null;
+  const sharp = sharpMod.default;
+
+  const [userResolved, garmResolved] = await Promise.all([
+    resolveImageBuffer(opts.userImg),
+    resolveImageBuffer(opts.cleanGarmentRef)
+  ]);
+
+  const panelW = 512;
+  const panelH = 768;
+
+  const [leftBuf, rightBuf] = await Promise.all([
+    sharp(userResolved.buffer).resize(panelW, panelH, { fit: 'cover', position: 'top' }).toBuffer(),
+    sharp(garmResolved.buffer).resize(panelW, panelH, { fit: 'cover', position: 'center' }).toBuffer()
+  ]);
+
+  const diptychBuf = await sharp({
+    create: { width: panelW * 2, height: panelH, channels: 3, background: { r: 255, g: 255, b: 255 } }
+  })
+    .composite([
+      { input: leftBuf, left: 0, top: 0 },
+      { input: rightBuf, left: panelW, top: 0 }
+    ])
+    .jpeg({ quality: 92 })
+    .toBuffer();
+
+  const diptychDataUrl = `data:image/jpeg;base64,${diptychBuf.toString('base64')}`;
+
+  const diptychPrompt = `Two-panel split-screen image: The LEFT panel shows a person; the RIGHT panel shows the reference garment. Keep this exact two-panel split-screen layout with the vertical division in the middle. Modify ONLY the LEFT panel so the person on the left is wearing the EXACT garment shown in the RIGHT panel — copying the exact fabric color, exact collar shape and thin piping line, exact button color, exact chest logo, and exact sleeve trim directly from the right panel (${opts.garmentDetailsPrompt}). Keep the left person's exact face, facial identity, beard, hair, skin tone, and background unchanged.`;
+
+  const editedDataUrl = await editImageWithFluxKontext(diptychDataUrl, diptychPrompt, {
+    guidanceScale: 2.5,
+    steps: 26,
+    seed: 42
+  });
+  if (!editedDataUrl) return null;
+
+  const { buffer: outBuf } = await resolveImageBuffer(editedDataUrl);
+  const outMeta = await sharp(outBuf).metadata();
+  const outW = outMeta.width || 1024;
+  const outH = outMeta.height || 768;
+
+  // If the output preserved the side-by-side landscape layout, crop the left panel (the dressed person)
+  if (outW >= outH * 1.15) {
+    const croppedLeft = await sharp(outBuf)
+      .extract({ left: 0, top: 0, width: Math.floor(outW * 0.495), height: outH })
+      .webp({ quality: 92 })
+      .toBuffer();
+    return `data:image/webp;base64,${croppedLeft.toString('base64')}`;
+  }
+
+  return editedDataUrl;
 }
 
 /**
@@ -710,7 +893,7 @@ export async function editImageWithFluxKontext(
 }
 
 /**
- * Virtual Garment Try-On powered by Vision-Grounded FLUX.1 Kontext Dev + 2-Image FASHN VTON 1.5 + Qwen Multi-Image.
+ * Virtual Garment Try-On powered by True 2-Image Garment Transfer + Vision-Grounded FLUX.1 Kontext Dev.
  */
 export async function tryOnGarmentFree(opts: {
   userImg: string;
@@ -719,34 +902,22 @@ export async function tryOnGarmentFree(opts: {
   productName?: string;
   productDescription?: string;
   colorHint?: string;
+  preferEngine?: 'diptych' | 'fashn' | 'qwen' | 'kontext';
 }): Promise<string | null> {
-  const uploadUserPromise = (async () => {
-    const { buffer, mimeType, ext } = await resolveImageBuffer(opts.userImg);
-    const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
-    const form = new FormData();
-    form.append('files', blob, `user.${ext}`);
-    const upResp = await fetch(`${KONTEXT_SPACE}/gradio_api/upload`, {
-      method: 'POST',
-      body: form,
-      signal: AbortSignal.timeout(15000)
-    });
-    if (!upResp.ok) throw new Error(`Kontext upload failed (${upResp.status})`);
-    const upPaths = await upResp.json();
-    return Array.isArray(upPaths) ? upPaths[0] : null;
-  })().catch(() => null);
-
-  const [uploadedUserPath, visionData, cleanName, cleanDesc] = await Promise.all([
-    uploadUserPromise,
+  const [visionData, cleanName, cleanDesc] = await Promise.all([
     describeGarmentImageVisually(opts.productImg),
     translateAndEnhancePrompt((opts.productName || opts.category || 'Traditional Garment').trim()),
     opts.productDescription ? translateAndEnhancePrompt(opts.productDescription.slice(0, 140)) : Promise.resolve('')
   ]);
 
-  const visualStructure = await analyzeGarmentVisualStructure(
-    opts.productImg,
-    visionData.rawCaption,
-    cleanName
-  );
+  const [visualStructure, cleanGarments] = await Promise.all([
+    analyzeGarmentVisualStructure(opts.productImg, visionData.rawCaption, cleanName),
+    prepareCleanGarmentBuffers({
+      productImg: opts.productImg,
+      rawVisionCaption: visionData.rawCaption,
+      category: opts.category
+    })
+  ]);
 
   const cat = (opts.category || 'Traditional Garment').trim();
   const prompt = buildExactTryOnPrompt({
@@ -758,38 +929,66 @@ export async function tryOnGarmentFree(opts: {
     isCatalogExactMatch: visionData.isCatalogExactMatch
   });
 
-  // Primary Lane: FLUX.1 Kontext Dev with exact visual DNA / cleaned Florence-2 garment vision
-  try {
-    const kontextOut = await editImageWithFluxKontext(opts.userImg, prompt, {
-      guidanceScale: 2.5,
-      steps: 26,
-      preUploadedPath: uploadedUserPath || undefined
+  const garmentDetailsSummary =
+    visualStructure || visionData.cleanGarmentCaption || `${cleanName} (${cat})`;
+
+  // Allow targeted benchmarking of any specific 2-image engine
+  if (opts.preferEngine === 'fashn') {
+    return await tryOnWithFashnVton({
+      userImg: opts.userImg,
+      productImg: cleanGarments.cleanPortraitDataUrl,
+      category: cat,
+      isModelPhoto: cleanGarments.isModelPhoto
     });
-    if (kontextOut) return kontextOut;
-  } catch (e: any) {
-    console.warn('[tryOnGarmentFree] Kontext primary lane error:', e?.message);
+  }
+  if (opts.preferEngine === 'qwen') {
+    return await tryOnWithQwenMultiImage(opts.userImg, cleanGarments.cleanPortraitDataUrl, prompt);
+  }
+  if (opts.preferEngine === 'diptych') {
+    return await tryOnWithKontextDiptych({
+      userImg: opts.userImg,
+      cleanGarmentRef: cleanGarments.cleanZoomDataUrl,
+      garmentDetailsPrompt: garmentDetailsSummary
+    });
+  }
+  if (opts.preferEngine === 'kontext') {
+    return await editImageWithFluxKontext(opts.userImg, prompt, {
+      guidanceScale: 2.5,
+      steps: 26
+    });
   }
 
-  // Secondary Lane: True 2-Image FASHN VTON 1.5 (passes BOTH userImg and productImg directly)
+  // Default Multi-Lane Execution:
+  // Lane 1: True 2-Image FASHN VTON 1.5 with banner-cropped clean garment reference
   try {
-    const isModelPhoto = /\b(man|woman|person|model|wearing|standing|sitting)\b/i.test(visionData.rawCaption);
     const vtonOut = await tryOnWithFashnVton({
       userImg: opts.userImg,
-      productImg: opts.productImg,
+      productImg: cleanGarments.cleanPortraitDataUrl,
       category: cat,
-      isModelPhoto
+      isModelPhoto: cleanGarments.isModelPhoto
     });
     if (vtonOut) return vtonOut;
   } catch (e: any) {
-    console.warn('[tryOnGarmentFree] FASHN VTON secondary lane error:', e?.message);
+    console.warn('[tryOnGarmentFree] FASHN VTON lane error:', e?.message);
   }
 
-  // Tertiary Lane: True 2-Image Qwen-Image-Edit-2511 (passes [userImg, productImg] gallery)
+  // Lane 2: True 2-Image Qwen-Image-Edit-2511 with [userImg, cleanPortraitDataUrl]
   try {
-    const qwenOut = await tryOnWithQwenMultiImage(opts.userImg, opts.productImg, prompt);
+    const qwenOut = await tryOnWithQwenMultiImage(opts.userImg, cleanGarments.cleanPortraitDataUrl, prompt);
     if (qwenOut) return qwenOut;
   } catch (e: any) {
-    console.warn('[tryOnGarmentFree] Qwen multi-image tertiary lane error:', e?.message);
+    console.warn('[tryOnGarmentFree] Qwen multi-image lane error:', e?.message);
+  }
+
+  // Lane 3: FLUX.1 Kontext Dev with exact visual DNA / cleaned Florence-2 garment vision
+  try {
+    const kontextOut = await editImageWithFluxKontext(opts.userImg, prompt, {
+      guidanceScale: 2.5,
+      steps: 26
+    });
+    if (kontextOut) return kontextOut;
+  } catch (e: any) {
+    console.warn('[tryOnGarmentFree] Kontext lane error:', e?.message);
   }
 
   return null;
