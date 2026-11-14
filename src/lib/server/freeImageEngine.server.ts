@@ -50,14 +50,36 @@ const CATALOG_VISUAL_DNA: Record<string, string> = {
   'product-1783883087839-6n0m0y.jpeg': 'jet-black textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a white S emblem on the left chest',
   'product-1783883097706-2kw083.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small white S emblem on the left chest',
 
-  // Sarees (/products/saree-1..3.jpg)
+  // Sarees (/products/saree-1..13.jpg)
   'saree-1.jpg': 'midnight navy blue handwoven Jamdani silk saree with antique copper-gold zari geometric border, red-and-gold floral buti motifs on the pallu, and matching navy blue blouse',
   'saree-2.jpg': 'traditional Tangail handloom cotton saree with intricate woven heritage border and geometric motifs',
   'saree-3.jpg': 'royal sapphire blue pure silk Jamdani saree with shimmering silver-and-gold zari border and woven floral motifs across the pallu and pleats',
+  'saree-4.jpg': 'deep midnight navy-blue handloom Tangail Jamdani saree with antique gold-and-maroon geometric temple border, colorful floral motifs woven on the pallu, and matching navy blouse',
+  'saree-5.jpg': 'soft pearl-grey and silver-taupe handloom Jamdani saree with delicate pastel pink and cream floral motifs on the pallu, cream-gold woven border, and matching grey blouse',
+  'saree-6.jpg': 'royal cobalt-blue handloom Tangail Jamdani saree with silver-and-gold geometric border and multicolored floral jamdani motifs on the pallu',
+  'saree-7.jpg': 'deep bottle-green / forest-green pure silk saree with subtle tonal self-embroidered border and matching sleeveless bottle-green blouse',
+  'saree-8.jpg': 'rich crimson-red Rajshahi silk party saree with ornate antique-gold zari floral border, gold floral buti motifs, and matching embroidered long-sleeve red blouse',
+  'saree-9.jpg': 'jet-black georgette party saree with shimmering black sequin and beadwork floral border and matching long-sleeve black embellished blouse',
+  'saree-10.jpg': 'deep peacock teal-blue shimmering silk saree with tonal teal sequin-embroidered scalloped border and matching sleeveless teal blouse',
+  'saree-11.jpg': 'classic jet-black satin-silk party saree with tonal black floral lace-embroidered border and matching sleeveless black blouse',
+  'saree-12.jpg': 'dusty mauve-lavender tissue silk saree with intricate rose-gold and silver zari embroidered border and scattered gold floral motifs',
+  'saree-13.jpg': 'deep emerald forest-green muslin silk saree with subtle tonal embroidered border and matching sleeveless dark green blouse',
 
-  // Three-Piece Suits (/products/threepiece-1..2.jpg)
+  // Three-Piece Suits (/products/threepiece-1..14.jpg)
   'threepiece-1.jpg': 'deep wine-purple embroidered long kameez tunic with copper-gold neckline and hem embroidery, matching wine-purple straight trousers, and a wine-purple dupatta scarf with ornate gold border',
   'threepiece-2.jpg': 'slate denim-blue embroidered long kameez tunic with ornate copper-red and gold floral embroidery on the neckline and hem border, matching blue straight trousers, and matching blue dupatta scarf with copper-gold border',
+  'threepiece-3.jpg': 'warm taupe-grey silk three-piece salwar kameez with antique gold zari embroidery on the neckline, cuffs, and hem, matching taupe trousers, and scalloped organza dupatta',
+  'threepiece-4.jpg': 'jet-black raw-silk three-piece salwar kameez with rich copper-gold and coral floral embroidery along the V-neck placket, cuffs, and draped black dupatta border',
+  'threepiece-5.jpg': 'deep plum-wine cotton three-piece salwar kameez with rust-orange and gold embroidered neckline, ornate floral border at the hem, matching plum trousers, and bordered dupatta',
+  'threepiece-6.jpg': 'indigo denim-blue cotton three-piece salwar kameez with rust-red and gold embroidered neckline, floral daman hem border, matching blue trousers, and striped border dupatta',
+  'threepiece-7.jpg': 'deep forest-green silk festive three-piece salwar kameez with rich antique-gold zardozi embroidery on the neckline, hem border, and heavily embroidered green-and-gold dupatta',
+  'threepiece-8.jpg': 'soft sage-pistachio green organza-silk three-piece salwar kameez with delicate tonal silver-green floral embroidery on the neckline, hem, and sheer organza dupatta',
+  'threepiece-9.jpg': 'dusty rose-pink embroidered festive three-piece salwar kameez with intricate pink-and-gold floral embroidery on the neckline, daman hem, and scalloped organza dupatta',
+  'threepiece-10.jpg': 'crisp white cotton three-piece salwar kameez covered in royal porcelain-blue floral block prints with a blue-and-white patterned border dupatta and matching printed trousers',
+  'threepiece-11.jpg': 'deep burgundy-maroon festive three-piece salwar kameez with tonal maroon sequin and thread embroidery on the neckline, hem, and sheer maroon organza dupatta',
+  'threepiece-12.jpg': 'emerald-green and multicolor floral printed festive three-piece salwar kameez with orange, pink, and gold botanical prints across the kameez and flowing dupatta',
+  'threepiece-13.jpg': 'deep bottle-green monochrome embroidered three-piece salwar kameez with tonal dark-green cutwork and sequin embroidery on the neckline, hem, and scalloped organza dupatta',
+  'threepiece-14.jpg': 'deep wine-maroon monochrome embroidered festive three-piece salwar kameez with tonal maroon cutwork embroidery on the neckline, hem, and scalloped sheer dupatta',
 
   // Panjabis (/products/panjabi-1..6.jpg & panjabi-kuthir-1..5.jpg)
   'panjabi-1.jpg': 'tailored Bangladeshi luxury men Panjabi kurta tunic in deep navy blue with intricate tonal blue geometric embroidery along the mandarin collar and chest placket',
