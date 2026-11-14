@@ -20,15 +20,13 @@ async function vendorFromToken(request: Request) {
   const { data: u, error: e } = await admin.auth.getUser(token);
   if (e || !u?.user?.email) throw error(401, 'Session expired — please sign in again');
 
-  const { data: vend, error: ve } = await admin
+  const { data: vend } = await admin
     .from('vendors')
-    .select('id, store_name, district, area, phone, description')
-    .ilike('email', u.user.email)
-    .maybeSingle();
+    .select('*')
+    .eq('email', u.user.email)
+    .single();
 
-  if (ve) throw error(500, `DB error: ${ve.message} (${ve.code})`);
-  if (!vend) throw error(403, `No vendor node linked to email: ${u.user.email}`);
-
+  if (!vend) throw error(403, 'No vendor node linked to this account');
   return { admin, vend };
 }
 
@@ -101,36 +99,20 @@ export const POST: RequestHandler = async ({ request }) => {
     preferred_courier: b.preferred_courier || existingMeta.preferred_courier || 'steadfast'
   };
 
-  // Try updating with metadata column first
-  let saved = false;
-  try {
-    const { error: e } = await admin
-      .from('vendors')
-      .update({
-        district: pickup_hub.district || vend.district,
-        area: pickup_hub.area || vend.area,
-        phone: pickup_hub.phone || vend.phone,
-        metadata: updatedMeta
-      })
-      .eq('id', vend.id);
-    if (!e) saved = true;
-  } catch {}
+  // Safe storage in description + district + area + phone
+  const baseDesc = (vend.description || '').split('__COURIER_CONFIG__:')[0].trim();
+  const newDesc = `${baseDesc}\n\n__COURIER_CONFIG__:${JSON.stringify(updatedMeta)}`;
+  const { error: e2 } = await admin
+    .from('vendors')
+    .update({
+      district: pickup_hub.district || vend.district,
+      area: pickup_hub.area || vend.area,
+      phone: pickup_hub.phone || vend.phone,
+      description: newDesc
+    })
+    .eq('id', vend.id);
 
-  // Zero-breakage fallback: If metadata column doesn't exist, store in description
-  if (!saved) {
-    const baseDesc = (vend.description || '').split('__COURIER_CONFIG__:')[0].trim();
-    const newDesc = `${baseDesc}\n\n__COURIER_CONFIG__:${JSON.stringify(updatedMeta)}`;
-    const { error: e2 } = await admin
-      .from('vendors')
-      .update({
-        district: pickup_hub.district || vend.district,
-        area: pickup_hub.area || vend.area,
-        phone: pickup_hub.phone || vend.phone,
-        description: newDesc
-      })
-      .eq('id', vend.id);
-    if (e2) throw error(500, e2.message);
-  }
+  if (e2) throw error(500, e2.message);
 
   return json({
     ok: true,

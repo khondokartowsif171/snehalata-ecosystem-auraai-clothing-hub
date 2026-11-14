@@ -61,12 +61,28 @@
     courierHubMsg = null;
     courierHubLoading = true;
     try {
+      const token = vendorToken();
+      if (!token) {
+        vendorPickupHub = {
+          address: vendor?.description || '',
+          district: vendor?.district || '',
+          area: vendor?.area || '',
+          phone: vendor?.phone || ''
+        };
+        courierHubLoading = false;
+        return;
+      }
       const res = await fetch('/api/vendor/courier', {
-        headers: { Authorization: `Bearer ${vendorToken()}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        vendorPickupHub = d.pickup_hub || { address: '', district: '', area: '', phone: '' };
+        vendorPickupHub = d.pickup_hub || {
+          address: '',
+          district: vendor?.district || '',
+          area: vendor?.area || '',
+          phone: vendor?.phone || ''
+        };
         vendorPreferredCourier = d.preferred_courier || 'steadfast';
         if (d.key_hints) {
           vendorCourierKeys = {
@@ -78,6 +94,13 @@
             paperfly_api_key: d.key_hints.paperfly_api_key || ''
           };
         }
+      } else {
+        vendorPickupHub = {
+          address: '',
+          district: vendor?.district || '',
+          area: vendor?.area || '',
+          phone: vendor?.phone || ''
+        };
       }
     } catch {
       // keep defaults
