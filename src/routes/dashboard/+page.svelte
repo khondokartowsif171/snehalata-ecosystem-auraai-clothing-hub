@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { fade, scale } from 'svelte/transition';
-  import { Zap, LayoutDashboard, Users, ShieldCheck, Cpu, Network, Package, Plus, Layout, Palette, Eye, EyeOff, Globe, BarChart3, Sparkles, Loader2, Upload, Pencil } from '@lucide/svelte';
+  import { Zap, LayoutDashboard, Users, ShieldCheck, Cpu, Network, Package, Plus, Layout, Palette, Eye, EyeOff, Globe, BarChart3, Sparkles, Loader2, Upload, Pencil, XCircle } from '@lucide/svelte';
   let showLoginPw = $state(false);
   import ProductCard from '$lib/components/ProductCard.svelte';
   import { getVendors, getProductsByVendor, syncWithNeuralGrid } from '$lib/mockData';
