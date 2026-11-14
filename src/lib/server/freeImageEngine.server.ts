@@ -189,12 +189,12 @@ export function classifyGarmentCategory(
 
   const isChildGarment =
     /^baby-\d+\./i.test(basename) ||
-    /\b(baby|kids?|child|children|toddler|junior|infant|boy'?s|girl'?s|বেবি|বাচ্চা|বাচ্চাদের|শিশু|শিশুদের|ছোটদের|কিডস|ফ্রক|frock)\b/i.test(
+    /(?:\b(?:baby|kids?|child|children|toddler|junior|infant|boy'?s|girl'?s|frock)\b|বেবি|বাচ্চা|বাচ্চাদের|শিশু|শিশুদের|ছোটদের|কিডস|ফ্রক)/i.test(
       catOnly
     );
 
   // 1. Saree / Shari
-  if (/\b(saree|sari|shari|jamdani|katan|muslin|benarasi|tangail|শাড়ি|শাড়ি|জামদানি|কাতান|মসলিন|তাঁত)\b/i.test(combined)) {
+  if (/(?:\b(?:saree|sari|shari|jamdani|katan|muslin|benarasi|tangail)\b|শাড়ি|শাড়ি|জামদানি|কাতান|মসলিন|তাঁত)/i.test(combined)) {
     return {
       kind: 'saree',
       vtonCategory: 'one-pieces',
@@ -206,7 +206,7 @@ export function classifyGarmentCategory(
 
   // 2. Three-Piece / Salwar Kameez / Kurti Set
   if (
-    /\b(three-?piece|3-?piece|salwar|shalwar|kameez|kamiz|kurti|lehenga|gharara|sharara|থ্রি-?পিস|থ্রিপিস|সালোয়ার|কামিজ|কুর্তি|লেহেঙ্গা|ওড়না)\b/i.test(
+    /(?:\b(?:three-?piece|3-?piece|salwar|shalwar|kameez|kamiz|kurti|lehenga|gharara|sharara)\b|থ্রি-?পিস|থ্রি পিস|থ্রিপিস|সালোয়ার|কামিজ|কুর্তি|লেহেঙ্গা|ওড়না)/i.test(
       combined
     )
   ) {
@@ -220,7 +220,7 @@ export function classifyGarmentCategory(
   }
 
   // 3. Borka / Abaya / Modest Gown
-  if (/\b(borka|burqa|abaya|hijab|khimar|jilbab|niqab|বোরকা|আবায়া|হিজাব|খিমার|জিলবাব)\b/i.test(combined)) {
+  if (/(?:\b(?:borka|burqa|abaya|hijab|khimar|jilbab|niqab)\b|বোরকা|আবায়া|হিজাব|খিমার|জিলবাব)/i.test(combined)) {
     return {
       kind: 'borka',
       vtonCategory: 'one-pieces',
@@ -232,11 +232,11 @@ export function classifyGarmentCategory(
 
   // 4. Blazer / Suit / Coat / Tuxedo / Sherwani / Waistcoat (Koti) / Jacket
   if (
-    /\b(blazer|suit|tuxedo|coat|overcoat|sherwani|waistcoat|koti|nehru jacket|jacket|hoodie|cardigan|ব্লেজার|স্যুট|কোট|শেরওয়ানি|কটি|ওয়েস্টকোট|জ্যাকেট|হুডি)\b/i.test(
+    /(?:\b(?:blazer|suit|tuxedo|coat|overcoat|sherwani|waistcoat|koti|nehru jacket|jacket|hoodie|cardigan)\b|ব্লেজার|স্যুট|কোট|শেরওয়ানি|কটি|ওয়েস্টকোট|জ্যাকেট|হুডি)/i.test(
       combined
     )
   ) {
-    const isFullSuit = /\b(suit|tuxedo|3-?piece|2-?piece|trouser|pant|স্যুট)\b/i.test(combined);
+    const isFullSuit = /(?:\b(?:suit|tuxedo|3-?piece|2-?piece|trouser|pant)\b|স্যুট)/i.test(combined);
     return {
       kind: 'blazer',
       vtonCategory: isFullSuit ? 'one-pieces' : 'tops',
@@ -248,7 +248,7 @@ export function classifyGarmentCategory(
 
   // 5. Kids / Baby Frocks & Full Sets
   if (isChildGarment) {
-    const isBottomOnly = /\b(pant|jeans|trouser|প্যান্ট|জিন্স)\b/i.test(catOnly) && !/\b(shirt|top|panjabi|suit|set)\b/i.test(catOnly);
+    const isBottomOnly = /(?:\b(?:pant|jeans|trouser)\b|প্যান্ট|জিন্স)/i.test(catOnly) && !/(?:\b(?:shirt|top|panjabi|suit|set)\b|শার্ট|পাঞ্জাবি|স্যুট|সেট)/i.test(catOnly);
     return {
       kind: 'baby',
       vtonCategory: isBottomOnly ? 'bottoms' : 'one-pieces',
@@ -260,10 +260,10 @@ export function classifyGarmentCategory(
 
   // 6. Jeans / Pants / Trousers / Bottoms
   if (
-    /\b(pant|pants|jeans|denim|trouser|trousers|chino|chinos|cargo|gabardine|jogger|joggers|leggings|palazzo|페이জামা|প্যান্ট|জিন্স|গ্যাবার্ডিন|ট্রাউজার|কার্গো|চিনো|পালাজ্জো)\b/i.test(
+    /(?:\b(?:pant|pants|jeans|denim|trouser|trousers|chino|chinos|cargo|gabardine|jogger|joggers|leggings|palazzo)\b|প্যান্ট|জিন্স|গ্যাবার্ডিন|ট্রাউজার|কার্গো|চিনো|পালাজ্জো)/i.test(
       catOnly
     ) &&
-    !/\b(shirt|t-?shirt|panjabi|kurta|blazer|top)\b/i.test(catOnly)
+    !/(?:\b(?:shirt|t-?shirt|panjabi|kurta|blazer|top)\b|শার্ট|টি-?শার্ট|পাঞ্জাবি|ব্লেজার)/i.test(catOnly)
   ) {
     return {
       kind: 'pant',
@@ -275,8 +275,8 @@ export function classifyGarmentCategory(
   }
 
   // 7. Panjabi / Kurta / Kabli
-  if (/\b(panjabi|punjabi|kurta|kabli|পাঞ্জাবি|পাঞ্জাবী|কুর্তা|কাবলি)\b/i.test(combined)) {
-    const hasPajamaSet = /\b(kabli|set|pajama|trouser|কাবলি|পায়জামা)\b/i.test(catOnly);
+  if (/(?:\b(?:panjabi|punjabi|kurta|kabli)\b|পাঞ্জাবি|পাঞ্জাবী|কুর্তা|কাবলি)/i.test(combined)) {
+    const hasPajamaSet = /(?:\b(?:kabli|set|pajama|trouser)\b|কাবলি|পায়জামা)/i.test(catOnly);
     return {
       kind: 'panjabi',
       vtonCategory: hasPajamaSet ? 'one-pieces' : 'tops',
@@ -287,7 +287,7 @@ export function classifyGarmentCategory(
   }
 
   // 8. Undergarments / Loungewear / Nightwear
-  if (/\b(undergarment|innerwear|nightwear|loungewear|sleepwear|lingerie|bra|brief|boxer|আন্ডারগার্মেন্ট|নাইটি|ইনারওয়্যার)\b/i.test(combined)) {
+  if (/(?:\b(?:undergarment|innerwear|nightwear|loungewear|sleepwear|lingerie|bra|brief|boxer)\b|আন্ডারগার্মেন্ট|নাইটি|ইনারওয়্যার)/i.test(combined)) {
     return {
       kind: 'undergarments',
       vtonCategory: 'one-pieces',
@@ -298,7 +298,7 @@ export function classifyGarmentCategory(
   }
 
   // 9. T-Shirt / Henley / Polo (checked BEFORE generic shirt)
-  if (/\b(t-?shirt|tshirt|tee|henley|polo|টি-?শার্ট|টিশার্ট|গেঞ্জি|পোলো)\b/i.test(combined)) {
+  if (/(?:\b(?:t-?shirt|tshirt|tee|henley|polo)\b|টি-?শার্ট|টিশার্ট|গেঞ্জি|পোলো)/i.test(combined)) {
     return {
       kind: 't-shirt',
       vtonCategory: 'tops',
@@ -309,7 +309,7 @@ export function classifyGarmentCategory(
   }
 
   // 10. Shirt (Formal / Casual / Button-down)
-  if (/\b(shirt|button-down|oxford|flannel|শার্ট)\b/i.test(combined)) {
+  if (/(?:\b(?:shirt|button-down|oxford|flannel)\b|শার্ট)/i.test(combined)) {
     return {
       kind: 'shirt',
       vtonCategory: 'tops',
