@@ -20,16 +20,14 @@ async function vendorFromToken(request: Request) {
   const { data: u, error: e } = await admin.auth.getUser(token);
   if (e || !u?.user?.email) throw error(401, 'Session expired — please sign in again');
 
-  let vend: any = null;
-  // Try standard columns first to guarantee 100% compatibility
-  const { data: v2, error: e2 } = await admin
+  const { data: vend, error: ve } = await admin
     .from('vendors')
     .select('id, store_name, district, area, phone, description')
-    .eq('email', u.user.email)
+    .ilike('email', u.user.email)
     .maybeSingle();
 
-  if (e2 || !v2) throw error(403, 'No vendor node linked to this account');
-  vend = v2;
+  if (ve) throw error(500, `DB error: ${ve.message} (${ve.code})`);
+  if (!vend) throw error(403, `No vendor node linked to email: ${u.user.email}`);
 
   return { admin, vend };
 }

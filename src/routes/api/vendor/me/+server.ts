@@ -21,11 +21,12 @@ export const GET: RequestHandler = async ({ request }) => {
   const { data: u, error: ae } = await a.auth.getUser(token);
   if (ae || !u?.user?.email) throw error(401, 'Session expired');
 
-  const { data: vend } = await a
+  const { data: vend, error: ve } = await a
     .from('vendors')
     .select('id, store_name, email, phone, status, website_url, vendor_type, category, commission_rate, fb_page_id, fb_page_name, fb_connected_at, district, area, description')
-    .eq('email', u.user.email)
-    .single();
-  if (!vend) throw error(403, 'No store linked to this account');
+    .ilike('email', u.user.email)
+    .maybeSingle();
+  if (ve) throw error(500, `DB error: ${ve.message} (${ve.code})`);
+  if (!vend) throw error(403, `No store linked to email: ${u.user.email}`);
   return json({ ok: true, vendor: vend });
 };
