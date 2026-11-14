@@ -21,11 +21,25 @@ export const GET: RequestHandler = async ({ request }) => {
   const { data: u, error: ae } = await a.auth.getUser(token);
   if (ae || !u?.user?.email) throw error(401, 'Session expired');
 
+  // Step 1: Query rock-solid vendor identity columns (same as /api/vendor/products)
   const { data: vend } = await a
     .from('vendors')
-    .select('*')
+    .select('id, store_name, email, status, vendor_type, commission_rate')
     .eq('email', u.user.email)
     .single();
+
   if (!vend) throw error(403, 'No store linked to this account');
-  return json({ ok: true, vendor: vend });
+
+  // Step 2: Query optional details safely
+  let extra: any = {};
+  try {
+    const { data: d } = await a
+      .from('vendors')
+      .select('phone, website_url, category, fb_page_id, fb_page_name, fb_connected_at, district, area, description')
+      .eq('id', vend.id)
+      .maybeSingle();
+    if (d) extra = d;
+  } catch {}
+
+  return json({ ok: true, vendor: { ...vend, ...extra } });
 };

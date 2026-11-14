@@ -20,14 +20,27 @@ async function vendorFromToken(request: Request) {
   const { data: u, error: e } = await admin.auth.getUser(token);
   if (e || !u?.user?.email) throw error(401, 'Session expired — please sign in again');
 
+  // Step 1: Identify vendor by session email using rock-solid core columns
   const { data: vend } = await admin
     .from('vendors')
-    .select('*')
+    .select('id, store_name')
     .eq('email', u.user.email)
     .single();
 
   if (!vend) throw error(403, 'No vendor node linked to this account');
-  return { admin, vend };
+
+  // Step 2: Fetch extra vendor details by ID (safe from schema drift)
+  let extra: any = {};
+  try {
+    const { data: d } = await admin
+      .from('vendors')
+      .select('district, area, phone, description')
+      .eq('id', vend.id)
+      .maybeSingle();
+    if (d) extra = d;
+  } catch {}
+
+  return { admin, vend: { ...vend, ...extra } };
 }
 
 /**

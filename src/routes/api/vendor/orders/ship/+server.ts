@@ -23,13 +23,28 @@ async function vendorFromToken(request: Request) {
   const admin = adminClient();
   const { data: u, error: e } = await admin.auth.getUser(token);
   if (e || !u?.user?.email) throw error(401, 'Session expired — please sign in again');
+
+  // Step 1: Query rock-solid vendor identity columns
   const { data: vend } = await admin
     .from('vendors')
-    .select('id, store_name, district, area, phone, description')
+    .select('id, store_name')
     .eq('email', u.user.email)
-    .maybeSingle();
+    .single();
+
   if (!vend) throw error(403, 'No vendor node linked to this account');
-  return { admin, vend };
+
+  // Step 2: Query optional details safely
+  let extra: any = {};
+  try {
+    const { data: d } = await admin
+      .from('vendors')
+      .select('district, area, phone, description')
+      .eq('id', vend.id)
+      .maybeSingle();
+    if (d) extra = d;
+  } catch {}
+
+  return { admin, vend: { ...vend, ...extra } };
 }
 
 /**
@@ -69,7 +84,6 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   // Check vendor BYOK credentials
-  const meta = vend.metadata || {};
   const keys = meta.courier_keys || {};
   const byokHeaders: Record<string, string> = {};
 
