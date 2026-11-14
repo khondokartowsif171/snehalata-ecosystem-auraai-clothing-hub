@@ -55,11 +55,17 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
       const { data: vend } = await a
         .from('vendors')
-        .select('store_name, metadata')
+        .select('store_name, district, area, phone, description')
         .eq('id', vendorId)
-        .single();
+        .maybeSingle();
 
-      const meta = vend?.metadata || {};
+      let meta: any = null;
+      if (vend?.description && vend.description.includes('__COURIER_CONFIG__:')) {
+        try {
+          meta = JSON.parse(vend.description.split('__COURIER_CONFIG__:')[1]);
+        } catch {}
+      }
+      meta = meta || (vend as any)?.metadata || {};
       const courierKeys = meta.courier_keys || {};
       if (courierKeys.steadfast_api_key) byokHeaders['x-steadfast-api-key'] = courierKeys.steadfast_api_key;
       if (courierKeys.steadfast_secret_key) byokHeaders['x-steadfast-secret-key'] = courierKeys.steadfast_secret_key;

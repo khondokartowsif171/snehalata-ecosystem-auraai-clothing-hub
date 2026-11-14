@@ -6,13 +6,28 @@ import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: 30 };
 
+function extractVendorMeta(vend: any) {
+  let meta = vend?.metadata;
+  if (!meta && vend?.description && vend.description.includes('__COURIER_CONFIG__:')) {
+    try {
+      const raw = vend.description.split('__COURIER_CONFIG__:')[1];
+      meta = JSON.parse(raw);
+    } catch {}
+  }
+  return meta || {};
+}
+
 async function vendorFromToken(request: Request) {
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) throw error(401, 'Missing vendor session');
   const admin = adminClient();
   const { data: u, error: e } = await admin.auth.getUser(token);
   if (e || !u?.user?.email) throw error(401, 'Session expired — please sign in again');
-  const { data: vend } = await admin.from('vendors').select('id, store_name, metadata').eq('email', u.user.email).single();
+  const { data: vend } = await admin
+    .from('vendors')
+    .select('id, store_name, district, area, phone, description')
+    .eq('email', u.user.email)
+    .maybeSingle();
   if (!vend) throw error(403, 'No vendor node linked to this account');
   return { admin, vend };
 }
@@ -24,9 +39,10 @@ async function vendorFromToken(request: Request) {
  */
 export const POST: RequestHandler = async ({ request }) => {
   const { admin, vend } = await vendorFromToken(request);
+  const meta = extractVendorMeta(vend);
   const b = await request.json().catch(() => ({}));
   const itemId = b?.itemId;
-  const chosenCourier = (b?.courier || vend.metadata?.preferred_courier || 'steadfast').toLowerCase();
+  const chosenCourier = (b?.courier || meta.preferred_courier || 'steadfast').toLowerCase();
 
   if (!itemId) throw error(400, 'itemId required');
 

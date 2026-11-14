@@ -2,14 +2,35 @@ import { json, error } from '@sveltejs/kit';
 import { adminClient } from '$lib/server/vendorSync';
 import type { RequestHandler } from './$types';
 
+function extractVendorMeta(vend: any) {
+  let meta = vend?.metadata;
+  if (!meta && vend?.description && vend.description.includes('__COURIER_CONFIG__:')) {
+    try {
+      const raw = vend.description.split('__COURIER_CONFIG__:')[1];
+      meta = JSON.parse(raw);
+    } catch {}
+  }
+  return meta || {};
+}
+
 async function vendorFromToken(request: Request) {
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) throw error(401, 'Missing vendor session');
   const admin = adminClient();
   const { data: u, error: e } = await admin.auth.getUser(token);
   if (e || !u?.user?.email) throw error(401, 'Session expired — please sign in again');
-  const { data: vend } = await admin.from('vendors').select('id, store_name, metadata').eq('email', u.user.email).single();
-  if (!vend) throw error(403, 'No vendor node linked to this account');
+
+  let vend: any = null;
+  // Try standard columns first to guarantee 100% compatibility
+  const { data: v2, error: e2 } = await admin
+    .from('vendors')
+    .select('id, store_name, district, area, phone, description')
+    .eq('email', u.user.email)
+    .maybeSingle();
+
+  if (e2 || !v2) throw error(403, 'No vendor node linked to this account');
+  vend = v2;
+
   return { admin, vend };
 }
 
@@ -19,12 +40,12 @@ async function vendorFromToken(request: Request) {
  */
 export const GET: RequestHandler = async ({ request }) => {
   const { vend } = await vendorFromToken(request);
-  const meta = vend.metadata || {};
+  const meta = extractVendorMeta(vend);
   const hub = meta.pickup_hub || {
-    address: '',
-    district: '',
-    area: '',
-    phone: ''
+    address: meta.pickup_address || '',
+    district: vend.district || '',
+    area: vend.area || '',
+    phone: vend.phone || ''
   };
   const keys = meta.courier_keys || {};
 
@@ -56,7 +77,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const { admin, vend } = await vendorFromToken(request);
   const b = await request.json().catch(() => ({}));
 
-  const existingMeta = vend.metadata || {};
+  const existingMeta = extractVendorMeta(vend);
   const existingKeys = existingMeta.courier_keys || {};
 
   // Preserve existing keys if user leaves them blank or masked
@@ -70,9 +91,9 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const pickup_hub = {
     address: String(b.address || existingMeta.pickup_hub?.address || '').trim(),
-    district: String(b.district || existingMeta.pickup_hub?.district || '').trim(),
-    area: String(b.area || existingMeta.pickup_hub?.area || '').trim(),
-    phone: String(b.phone || existingMeta.pickup_hub?.phone || '').trim()
+    district: String(b.district || vend.district || '').trim(),
+    area: String(b.area || vend.area || '').trim(),
+    phone: String(b.phone || vend.phone || '').trim()
   };
 
   const updatedMeta = {
@@ -82,8 +103,36 @@ export const POST: RequestHandler = async ({ request }) => {
     preferred_courier: b.preferred_courier || existingMeta.preferred_courier || 'steadfast'
   };
 
-  const { error: e } = await admin.from('vendors').update({ metadata: updatedMeta }).eq('id', vend.id);
-  if (e) throw error(500, e.message);
+  // Try updating with metadata column first
+  let saved = false;
+  try {
+    const { error: e } = await admin
+      .from('vendors')
+      .update({
+        district: pickup_hub.district || vend.district,
+        area: pickup_hub.area || vend.area,
+        phone: pickup_hub.phone || vend.phone,
+        metadata: updatedMeta
+      })
+      .eq('id', vend.id);
+    if (!e) saved = true;
+  } catch {}
+
+  // Zero-breakage fallback: If metadata column doesn't exist, store in description
+  if (!saved) {
+    const baseDesc = (vend.description || '').split('__COURIER_CONFIG__:')[0].trim();
+    const newDesc = `${baseDesc}\n\n__COURIER_CONFIG__:${JSON.stringify(updatedMeta)}`;
+    const { error: e2 } = await admin
+      .from('vendors')
+      .update({
+        district: pickup_hub.district || vend.district,
+        area: pickup_hub.area || vend.area,
+        phone: pickup_hub.phone || vend.phone,
+        description: newDesc
+      })
+      .eq('id', vend.id);
+    if (e2) throw error(500, e2.message);
+  }
 
   return json({
     ok: true,
