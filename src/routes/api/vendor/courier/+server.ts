@@ -66,14 +66,16 @@ export const GET: RequestHandler = async ({ request }) => {
       steadfast: Boolean(keys.steadfast_api_key && keys.steadfast_secret_key),
       pathao: Boolean(keys.pathao_client_id && keys.pathao_client_secret),
       redx: Boolean(keys.redx_api_token),
-      paperfly: Boolean(keys.paperfly_api_key)
+      paperfly: Boolean(keys.paperfly_api_key && keys.paperfly_username && keys.paperfly_password)
     },
     // Masked hints for UI
     key_hints: {
       steadfast_api_key: keys.steadfast_api_key ? `***${keys.steadfast_api_key.slice(-4)}` : '',
       pathao_client_id: keys.pathao_client_id ? `***${keys.pathao_client_id.slice(-4)}` : '',
       redx_api_token: keys.redx_api_token ? `***${keys.redx_api_token.slice(-4)}` : '',
-      paperfly_api_key: keys.paperfly_api_key ? `***${keys.paperfly_api_key.slice(-4)}` : ''
+      redx_store_id: keys.redx_store_id || '',
+      paperfly_api_key: keys.paperfly_api_key ? `***${keys.paperfly_api_key.slice(-4)}` : '',
+      paperfly_username: keys.paperfly_username || ''
     }
   });
 };
@@ -96,7 +98,10 @@ export const POST: RequestHandler = async ({ request }) => {
   if (b.pathao_client_id && !b.pathao_client_id.startsWith('***')) newKeys.pathao_client_id = b.pathao_client_id.trim();
   if (b.pathao_client_secret && !b.pathao_client_secret.startsWith('***')) newKeys.pathao_client_secret = b.pathao_client_secret.trim();
   if (b.redx_api_token && !b.redx_api_token.startsWith('***')) newKeys.redx_api_token = b.redx_api_token.trim();
+  if (b.redx_store_id !== undefined) newKeys.redx_store_id = String(b.redx_store_id || '').trim();
   if (b.paperfly_api_key && !b.paperfly_api_key.startsWith('***')) newKeys.paperfly_api_key = b.paperfly_api_key.trim();
+  if (b.paperfly_username !== undefined) newKeys.paperfly_username = String(b.paperfly_username || '').trim();
+  if (b.paperfly_password && !b.paperfly_password.startsWith('•••')) newKeys.paperfly_password = b.paperfly_password.trim();
 
   const pickup_hub = {
     address: String(b.address || existingMeta.pickup_hub?.address || '').trim(),

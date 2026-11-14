@@ -51,7 +51,10 @@
     pathao_client_id: '',
     pathao_client_secret: '',
     redx_api_token: '',
-    paperfly_api_key: ''
+    redx_store_id: '',
+    paperfly_api_key: '',
+    paperfly_username: '',
+    paperfly_password: ''
   });
   let vendorPreferredCourier = $state('steadfast');
   let vendorShippingItemId = $state<number | null>(null);
@@ -91,7 +94,10 @@
             pathao_client_id: d.key_hints.pathao_client_id || '',
             pathao_client_secret: d.key_hints.pathao_client_id ? '••••••••' : '',
             redx_api_token: d.key_hints.redx_api_token || '',
-            paperfly_api_key: d.key_hints.paperfly_api_key || ''
+            redx_store_id: d.key_hints.redx_store_id || '',
+            paperfly_api_key: d.key_hints.paperfly_api_key || '',
+            paperfly_username: d.key_hints.paperfly_username || '',
+            paperfly_password: d.key_hints.paperfly_username ? '••••••••' : ''
           };
         }
       } else {
@@ -841,24 +847,52 @@
               </div>
             </div>
 
-            <!-- RedX & Paperfly (compact) -->
-            <div class="grid grid-cols-2 gap-2">
-              <div class="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
-                <p class="text-[11px] font-bold text-white">📦 RedX Delivery</p>
+            <!-- RedX Delivery -->
+            <div class="p-3.5 bg-white/5 border border-white/10 rounded-2xl space-y-2">
+              <p class="text-xs font-bold text-white flex items-center justify-between">
+                <span>📦 RedX Delivery</span>
+                <span class="text-[9px] text-gray-500 font-normal">openapi.redx.com.bd</span>
+              </p>
+              <div class="grid grid-cols-2 gap-2">
                 <input
                   type="password"
                   bind:value={vendorCourierKeys.redx_api_token}
-                  placeholder="API Token"
-                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                  placeholder="API Token (Bearer)"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[11px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+                <input
+                  type="text"
+                  bind:value={vendorCourierKeys.redx_store_id}
+                  placeholder="Pickup Store ID (ঐচ্ছিক)"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[11px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
                 />
               </div>
-              <div class="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1.5">
-                <p class="text-[11px] font-bold text-white">🦅 Paperfly Go</p>
+            </div>
+
+            <!-- Paperfly Go -->
+            <div class="p-3.5 bg-white/5 border border-white/10 rounded-2xl space-y-2">
+              <p class="text-xs font-bold text-white flex items-center justify-between">
+                <span>🦅 Paperfly Go</span>
+                <span class="text-[9px] text-gray-500 font-normal">api.paperfly.com.bd</span>
+              </p>
+              <div class="grid grid-cols-3 gap-2">
                 <input
                   type="password"
                   bind:value={vendorCourierKeys.paperfly_api_key}
                   placeholder="Paperfly Key"
-                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+                <input
+                  type="text"
+                  bind:value={vendorCourierKeys.paperfly_username}
+                  placeholder="Username"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
+                />
+                <input
+                  type="password"
+                  bind:value={vendorCourierKeys.paperfly_password}
+                  placeholder="Password"
+                  class="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-[10px] font-mono text-white focus:border-aura-green outline-none transition-all placeholder:text-gray-600"
                 />
               </div>
             </div>

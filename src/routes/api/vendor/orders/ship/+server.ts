@@ -104,11 +104,14 @@ export const POST: RequestHandler = async ({ request }) => {
       throw error(400, 'আপনার RedX API Token সেট করা নেই। ড্যাশবোর্ডের কুরিয়ার সেটিংস থেকে আগে টোকেন যোগ করুন।');
     }
     byokHeaders['x-redx-api-token'] = keys.redx_api_token;
+    if (keys.redx_store_id) byokHeaders['x-redx-pickup-store-id'] = keys.redx_store_id;
   } else if (chosenCourier === 'paperfly') {
     if (!keys.paperfly_api_key) {
       throw error(400, 'আপনার Paperfly API Key সেট করা নেই। ড্যাশবোর্ডের কুরিয়ার সেটিংস থেকে আগে কি (Key) যোগ করুন।');
     }
     byokHeaders['x-paperfly-api-key'] = keys.paperfly_api_key;
+    if (keys.paperfly_username) byokHeaders['x-paperfly-username'] = keys.paperfly_username;
+    if (keys.paperfly_password) byokHeaders['x-paperfly-password'] = keys.paperfly_password;
   } else {
     throw error(400, 'অসমর্থিত কুরিয়ার সার্ভিস নির্বাচন করা হয়েছে।');
   }
