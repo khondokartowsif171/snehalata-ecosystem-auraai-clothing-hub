@@ -13,8 +13,22 @@
   let q = $state('');
   let searchLoading = $state(false);
   let listening = $state(false);
-  let voiceSupported = $state(false);
+  let voiceSupported = $state(true);
+  let voiceLang = $state<'bn-BD' | 'en-US'>('bn-BD');
+  let voiceStatusText = $state('');
+  let voiceDrawerOpen = $state(false);
   let focused = $state(false);
+
+  const QUICK_VOICE_CHIPS = [
+    { label: 'সবুজ টি-শার্ট', query: 'সবুজ টি-শার্ট' },
+    { label: 'জামদানি শাড়ি', query: 'জামদানি শাড়ি' },
+    { label: 'পাঞ্জাবি', query: 'পাঞ্জাবি' },
+    { label: 'থ্রি-পিস', query: 'থ্রি-পিস' },
+    { label: 'বাচ্চাদের পোশাক', query: 'বাচ্চাদের পোশাক' },
+    { label: 'জিন্স প্যান্ট', query: 'জিন্স প্যান্ট' },
+    { label: 'ব্লেজার ও স্যুট', query: 'ব্লেজার স্যুট' },
+    { label: 'বোরকা', query: 'বোরকা' }
+  ];
 
   // Rotating placeholder — cycles helpful hints so the search always feels alive.
   const PLACEHOLDERS = [
@@ -28,9 +42,13 @@
 
   // Neural search lives in the global header → text goes to the home via ?q= (matches the
   // site's SearchAction schema); the home reacts to the param and runs the semantic search.
-  function submitSearch() {
-    const term = q.trim();
+  function submitSearch(customTerm?: string) {
+    const term = (customTerm ?? q).trim();
     if (!term) return;
+    q = term;
+    voiceDrawerOpen = false;
+    listening = false;
+    try { recognition?.stop(); } catch {}
     goto('/?q=' + encodeURIComponent(term));
   }
 
@@ -40,37 +58,81 @@
     const file = input.files?.[0];
     if (!file) return;
     searchLoading = true;
+    voiceDrawerOpen = false;
     try {
       const base64 = await fileToCompressedDataURL(file);
       sessionStorage.setItem('aura_visual_pending', base64);
+      sessionStorage.setItem('aura_visual_preview', base64);
       if (location.pathname === '/') {
         window.dispatchEvent(new Event('aura-visual'));
       } else {
-        goto('/');
+        await goto('/');
+        window.dispatchEvent(new Event('aura-visual'));
       }
     } catch { /* ignore */ }
     finally { searchLoading = false; input.value = ''; }
   }
 
-  // Bangla voice search — speak in বাংলা/English, Aura searches. Uses the browser's
-  // Web Speech API (free, on-device on Android Chrome). No key, no server cost.
+  // Bangla & English voice search — speak in বাংলা/English, Aura searches immediately.
   let recognition: any = null;
   function startVoice() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    if (listening) { try { recognition?.stop(); } catch {} return; }
-    recognition = new SR();
-    recognition.lang = 'bn-BD';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (ev: any) => {
-      const text = ev.results?.[0]?.[0]?.transcript?.trim() || '';
-      if (text) { q = text; submitSearch(); }
-    };
-    recognition.onend = () => { listening = false; };
-    recognition.onerror = () => { listening = false; };
-    listening = true;
-    try { recognition.start(); } catch { listening = false; }
+    if (listening) {
+      try { recognition?.stop(); } catch {}
+      listening = false;
+      return;
+    }
+    voiceDrawerOpen = true;
+    if (!SR) {
+      voiceStatusText = 'মাইক্রোফোন প্রস্তুত — নিচের যেকোনো ভয়েস ট্যাগ চাপুন বা টাইপ করুন:';
+      return;
+    }
+    try {
+      recognition = new SR();
+      recognition.lang = voiceLang;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      voiceStatusText = voiceLang === 'bn-BD' ? '🎙️ শুনছি... বাংলায় বা ইংরেজিতে বলুন' : '🎙️ Listening... Speak product name';
+
+      recognition.onresult = (ev: any) => {
+        const res = ev.results?.[ev.results.length - 1];
+        const text = res?.[0]?.transcript?.trim() || '';
+        if (text) {
+          q = text;
+          voiceStatusText = `🎙️ "${text}"`;
+          if (res.isFinal) {
+            submitSearch(text);
+          }
+        }
+      };
+      recognition.onend = () => {
+        listening = false;
+        if (q.trim() && voiceDrawerOpen) {
+          submitSearch(q.trim());
+        }
+      };
+      recognition.onerror = (err: any) => {
+        listening = false;
+        voiceStatusText =
+          err?.error === 'not-allowed'
+            ? 'মাইক্রোফোন পারমিশন দিন অথবা নিচের কুইক ভয়েস চিপে ক্লিক করুন:'
+            : 'আবার চেষ্টা করুন অথবা নিচের ভয়েস অপশন বেছে নিন:';
+      };
+      listening = true;
+      recognition.start();
+    } catch {
+      listening = false;
+      voiceStatusText = 'নিচের যেকোনো ভয়েস অপশন বেছে নিন:';
+    }
+  }
+
+  function toggleVoiceLang() {
+    voiceLang = voiceLang === 'bn-BD' ? 'en-US' : 'bn-BD';
+    if (listening) {
+      try { recognition?.stop(); } catch {}
+      listening = false;
+      setTimeout(startVoice, 150);
+    }
   }
 
   $effect(() => {
@@ -105,7 +167,7 @@
     </a>
 
     <!-- Neural search — permanent in the header (text · voice · photo) -->
-    <div class="flex-1 max-w-xl mx-3 sm:mx-5">
+    <div class="flex-1 max-w-xl mx-3 sm:mx-5 relative">
       <div class="relative flex items-center gap-2">
         <div class="flex-1 relative group">
           <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 text-aura-dim group-focus-within:text-aura-green transition-colors" size={16} />
@@ -115,17 +177,44 @@
             aria-label="Neural search"
             class="w-full bg-aura-card border border-aura-green/16 rounded-xl h-10 pl-10 pr-3 text-[13px] focus:outline-none focus:border-aura-green/55 transition-all placeholder:text-aura-dim" />
         </div>
-        {#if voiceSupported}
-          <button type="button" onclick={startVoice} title="বাংলায় বলে খুঁজুন · Voice search" aria-label="Voice search"
-            class="w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center transition-all cursor-pointer {listening ? 'bg-aura-green/20 border-aura-green text-aura-green animate-pulse' : 'bg-aura-card border-aura-green/18 text-aura-green hover:border-aura-green'}">
-            <Mic size={16} />
-          </button>
-        {/if}
-        <label class="w-10 h-10 shrink-0 rounded-xl bg-aura-card border border-aura-green/18 flex items-center justify-center text-aura-green hover:border-aura-green transition-all cursor-pointer" title="Search by photo" aria-label="Search by photo">
+        <button type="button" onclick={startVoice} title="বাংলায় বা ইংরেজিতে বলে খুঁজুন · Voice search" aria-label="Voice search"
+          class="w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center transition-all cursor-pointer {listening ? 'bg-aura-green text-black border-aura-green shadow-[0_0_18px_rgba(16,185,129,0.6)] animate-pulse' : 'bg-aura-card border-aura-green/18 text-aura-green hover:border-aura-green'}">
+          <Mic size={16} />
+        </button>
+        <label class="w-10 h-10 shrink-0 rounded-xl bg-aura-card border border-aura-green/18 flex items-center justify-center text-aura-green hover:border-aura-green transition-all cursor-pointer" title="ছবি আপলোড করে খুঁজুন · Search by photo" aria-label="Search by photo">
           <input type="file" accept="image/*" onchange={onCamera} class="hidden" disabled={searchLoading} />
           {#if searchLoading}<Loader2 size={15} class="animate-spin" />{:else}<Camera size={16} />{/if}
         </label>
       </div>
+
+      {#if voiceDrawerOpen}
+        <div class="absolute left-0 right-0 top-12 z-50 rounded-2xl bg-[#0b1310]/98 border border-aura-green/35 p-3.5 shadow-2xl backdrop-blur-xl" transition:fade={{ duration: 150 }}>
+          <div class="flex items-center justify-between gap-2 mb-2.5">
+            <div class="flex items-center gap-2 text-xs font-bold text-aura-green">
+              <span class="w-2.5 h-2.5 rounded-full bg-aura-green {listening ? 'animate-ping' : ''}"></span>
+              <span>{voiceStatusText || '🎙️ ভয়েস সার্চ সক্রিয়'}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick={toggleVoiceLang}
+                class="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase bg-white/10 text-aura-cream hover:bg-aura-green hover:text-black transition-all cursor-pointer">
+                {voiceLang === 'bn-BD' ? 'বাংলা ⇄ EN' : 'EN ⇄ বাংলা'}
+              </button>
+              <button type="button" onclick={() => { voiceDrawerOpen = false; listening = false; try { recognition?.stop(); } catch {} }}
+                class="p-1 rounded-lg text-gray-400 hover:text-white cursor-pointer" aria-label="Close voice search">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            {#each QUICK_VOICE_CHIPS as chip}
+              <button type="button" onclick={() => submitSearch(chip.query)}
+                class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-aura-green/25 text-[#cfe8dd] hover:bg-aura-green hover:text-black transition-all cursor-pointer">
+                🎙️ {chip.label}
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </div>
 
     <div class="hidden lg:flex items-center gap-8">

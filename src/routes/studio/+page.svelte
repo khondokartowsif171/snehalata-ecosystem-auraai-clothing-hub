@@ -75,7 +75,9 @@
   const DEMO_SILHOUETTES = [
     { label: 'Female Model 1', url: '/products/threepiece-1.jpg' },
     { label: 'Female Model 2', url: '/products/saree-2.jpg' },
-    { label: 'Male Model 1', url: 'https://tfavcmbbtpgapqdnblzq.supabase.co/storage/v1/object/public/tryon/imports/product-1783882959037-3rtuok.jpeg' }
+    { label: 'Male Model 1', url: 'https://tfavcmbbtpgapqdnblzq.supabase.co/storage/v1/object/public/tryon/imports/product-1783882959037-3rtuok.jpeg' },
+    { label: 'Boy Kid Model', url: '/products/baby-11.jpg' },
+    { label: 'Girl Kid Model', url: '/products/baby-4.jpg' }
   ];
 
   // Cosmetics try-on — selfie + a shade → recoloured lips/cheeks/eyes

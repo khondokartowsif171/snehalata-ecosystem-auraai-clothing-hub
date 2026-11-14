@@ -25,12 +25,15 @@
   let semanticActive = $state(false);
   let semanticResults = $state<any[]>([]);
   let semanticCaption = $state('');
+  let visualPreviewUrl = $state<string | null>(null);
   let searchLoading = $state(false);
 
   async function runSemanticSearch() {
     const q = searchQuery.trim();
     if (!q) { semanticActive = false; return; }
     searchLoading = true;
+    visualPreviewUrl = null;
+    scrollToCollection();
     try {
       const res = await fetch('/api/search', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -40,6 +43,7 @@
       semanticResults = d.products || [];
       semanticCaption = '';
       semanticActive = true;
+      scrollToCollection();
     } catch {
       semanticActive = false; // fall back to the client-side keyword filter
     } finally {
@@ -51,6 +55,9 @@
   // (via sessionStorage) so it works regardless of which page took the photo.
   async function runVisualWith(base64: string) {
     searchLoading = true;
+    visualPreviewUrl = base64;
+    semanticActive = true;
+    scrollToCollection();
     try {
       const res = await fetch('/api/search', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -73,6 +80,7 @@
     semanticActive = false;
     semanticResults = [];
     semanticCaption = '';
+    visualPreviewUrl = null;
     searchQuery = '';
   }
 
@@ -776,17 +784,31 @@
     <!-- Main Content -->
     <main class="flex-1 p-5 sm:p-6 lg:p-12">
       <!-- semantic/visual search results banner -->
-      {#if semanticActive}
+      {#if semanticActive || searchLoading}
         <section class="mb-10">
-          <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-aura-green/15 to-aura-gold/10 border border-white/10">
-            <div class="flex items-center gap-3">
-              <div class="p-2.5 rounded-xl bg-aura-green/20 text-aura-green"><Sparkles size={16} /></div>
+          <div class="flex flex-wrap items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-aura-green/18 to-aura-gold/12 border border-aura-green/35 shadow-xl">
+            <div class="flex items-center gap-4">
+              {#if visualPreviewUrl}
+                <img src={visualPreviewUrl} alt="Visual Search Preview" class="w-14 h-14 rounded-2xl object-cover border-2 border-aura-green shadow-lg shrink-0" />
+              {:else}
+                <div class="p-3 rounded-2xl bg-aura-green/20 text-aura-green shrink-0"><Sparkles size={18} /></div>
+              {/if}
               <div>
-                <p class="text-sm font-black">Neural results · {semanticResults.length} matches</p>
-                {#if semanticCaption}<p class="text-[10px] text-gray-400 mt-0.5 italic">From your photo: “{semanticCaption}”</p>{/if}
+                {#if searchLoading}
+                  <p class="text-sm font-black text-aura-green animate-pulse">
+                    {visualPreviewUrl ? '📷 ছবি বিশ্লেষণ করে স্নেহলতার কালেকশন খোঁজা হচ্ছে...' : `🎙️ নিউরাল গ্রিডে “${searchQuery}” খোঁজা হচ্ছে...`}
+                  </p>
+                {:else}
+                  <p class="text-sm font-black text-white">
+                    {visualPreviewUrl ? '📷 ভিজ্যুয়াল ইমেজ সার্চ' : `🎙️ নিউরাল সার্চ: “${searchQuery}”`} · <span class="text-aura-green">{semanticResults.length}টি মিল পাওয়া গেছে</span>
+                  </p>
+                {/if}
+                {#if semanticCaption}
+                  <p class="text-[11px] text-[#cfe8dd] mt-0.5 italic">AI Vision: “{semanticCaption}”</p>
+                {/if}
               </div>
             </div>
-            <button onclick={clearSemantic} class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all cursor-pointer">
+            <button onclick={clearSemantic} class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 border border-white/15 text-[10px] font-black uppercase tracking-widest hover:bg-aura-green hover:text-black transition-all cursor-pointer">
               <X size={14} /> Clear
             </button>
           </div>

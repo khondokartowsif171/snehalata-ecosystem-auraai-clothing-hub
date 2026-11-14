@@ -62,45 +62,86 @@ async function productDetails(query: string): Promise<string> {
   }
 }
 
+async function trackOrderTool(orderId: string): Promise<string> {
+  try {
+    const cleanId = String(orderId || '').replace(/^ORD-/i, '').trim();
+    if (!cleanId) return 'Please provide an Order ID or Tracking Code (e.g. "7" or "SNH-...").';
+    const r = await fetch(`/api/orders/track?id=${encodeURIComponent(cleanId)}`);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d?.order) return `Order "${orderId}" was not found on Snehalata.`;
+    const o = d.order;
+    return [
+      `Order ID: ${o.tracking || 'ORD-' + o.id}`,
+      `Status: ${o.status}`,
+      `Total: ${BDT(o.total)}`,
+      o.courier_tracking_code ? `Steadfast / Aura Courier Tracking: ${o.courier_tracking_code}` : '',
+      `Live Tracking Page: https://www.snehalata.com/tracking/${encodeURIComponent(cleanId)}`
+    ]
+      .filter(Boolean)
+      .join('\n');
+  } catch {
+    return 'Could not track order right now.';
+  }
+}
+
 async function registerAll(mc: any) {
-  await mc.registerTool({
-    name: 'search_snehalata_products',
-    description:
-      'Search the Snehalata marketplace (Bangladesh) for products — clothing, sarees, panjabi, kurti, cosmetics, skincare and more. Returns matching products with name, price in BDT (taka), and a product link.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'What to search for, e.g. "green saree", "men panjabi", "lipstick"' },
-        maxPrice: { type: 'number', description: 'Optional maximum price in BDT (taka)' }
+  const tools = [
+    {
+      name: 'search_snehalata_products',
+      description:
+        'Search the Snehalata marketplace (Bangladesh) for products — sarees, three-piece, panjabi, t-shirts, shirts, jeans/pants, kids/baby clothing, blazers, borka, cosmetics and more. Supports both Bengali and English queries.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'What to search for, e.g. "green t-shirt", "jamdani saree", "পাঞ্জাবি", "বাচ্চাদের পোশাক"' },
+          maxPrice: { type: 'number', description: 'Optional maximum price in BDT (taka)' }
+        },
+        required: ['query']
       },
-      required: ['query']
+      execute: async ({ query, maxPrice }: any) =>
+        searchProducts(String(query || ''), typeof maxPrice === 'number' ? maxPrice : undefined)
     },
-    execute: async ({ query, maxPrice }: any) =>
-      searchProducts(String(query || ''), typeof maxPrice === 'number' ? maxPrice : undefined)
-  });
-
-  await mc.registerTool({
-    name: 'get_snehalata_product_details',
-    description:
-      'Get details of the best-matching single product on Snehalata for a query — name, price in BDT, store, short description, and a link to buy.',
-    inputSchema: {
-      type: 'object',
-      properties: { query: { type: 'string', description: 'Product name or description' } },
-      required: ['query']
+    {
+      name: 'get_snehalata_product_details',
+      description:
+        'Get details of the best-matching single product on Snehalata for a query — name, price in BDT, store, short description, and a link to buy.',
+      inputSchema: {
+        type: 'object',
+        properties: { query: { type: 'string', description: 'Product name or description' } },
+        required: ['query']
+      },
+      execute: async ({ query }: any) => productDetails(String(query || ''))
     },
-    execute: async ({ query }: any) => productDetails(String(query || ''))
-  });
+    {
+      name: 'track_snehalata_order',
+      description:
+        'Track a Snehalata customer order in real time (bridged to Aura Courier MCP — Steadfast, Pathao, RedX, Paperfly) by Order ID or Tracking Code.',
+      inputSchema: {
+        type: 'object',
+        properties: { orderId: { type: 'string', description: 'Order ID or tracking number, e.g. "7"' } },
+        required: ['orderId']
+      },
+      execute: async ({ orderId }: any) => trackOrderTool(String(orderId || ''))
+    },
+    {
+      name: 'snehalata_store_info',
+      description: 'How to buy on Snehalata: delivery coverage, payment options, ordering steps, AR Try-On Studio, and features.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () =>
+        'Snehalata (https://www.snehalata.com) is a Bangladeshi AI-powered online marketplace with clothing (Saree, Three-Piece, Panjabi, Shirt, T-Shirt, Jeans/Pant, Kids/Baby, Blazer, Borka), cosmetics and more from verified local sellers. Payment: Cash on Delivery and online (SSLCommerz). Delivery: across Bangladesh via Aura Courier MCP (Steadfast, Pathao, RedX, Paperfly). Bonus: 100% Free 2-Image AR Virtual Try-On & AI Image Generator at https://www.snehalata.com/studio.'
+    }
+  ];
 
-  await mc.registerTool({
-    name: 'snehalata_store_info',
-    description: 'How to buy on Snehalata: delivery coverage, payment options, ordering steps, and features.',
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () =>
-      'Snehalata (https://www.snehalata.com) is a Bangladeshi online marketplace with clothing, cosmetics and more from many local sellers. Payment: Cash on Delivery and online (SSLCommerz). Delivery: across Bangladesh. To order: open a product link, add to cart, then checkout with your name, phone and address. Bonus: AR virtual try-on for clothing and makeup.'
-  });
+  for (const t of tools) {
+    try {
+      await mc.registerTool(t);
+    } catch {
+      /* ignore individual registration error */
+    }
+  }
 
   // eslint-disable-next-line no-console
-  console.log('[WebMCP] Snehalata agent tools registered ✅');
+  console.log('[WebMCP] Snehalata agent tools registered ✅ (5 tools active)');
 }
 
 let done = false;
@@ -108,10 +149,22 @@ export async function enableWebMcp() {
   if (done || typeof document === 'undefined') return;
   done = true;
   injectToken();
-  // The API is gated behind the origin trial; after injecting the token give Chrome a moment,
-  // then register. Retry a few times (browsers without the trial simply no-op).
+
+  // Always expose a direct browser-accessible bridge on window.snehalataWebMCP so AI agents,
+  // Chrome extensions, and DevTools can inspect and invoke Snehalata's WebMCP tools even before Chrome's native flag is toggled.
+  (window as any).snehalataWebMCP = {
+    status: 'ACTIVE',
+    originTrial: 'https://snehalata.com (Valid to Nov 2026)',
+    backendCourierMcp: 'https://courier.auraajenticai.cloud/mcp',
+    tools: ['search_snehalata_products', 'get_snehalata_product_details', 'track_snehalata_order', 'snehalata_store_info'],
+    searchProducts,
+    productDetails,
+    trackOrder: trackOrderTool
+  };
+
+  // Register with W3C / Chrome WebMCP (`navigator.modelContext` or `document.modelContext`)
   for (let i = 0; i < 6; i++) {
-    const mc = (document as any).modelContext;
+    const mc = (navigator as any)?.modelContext || (document as any)?.modelContext;
     if (mc && typeof mc.registerTool === 'function') {
       try {
         await registerAll(mc);

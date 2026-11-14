@@ -44,3 +44,40 @@ export async function groqChat(message: string, inventory: string, vendors: stri
   if (!text) throw new Error('Groq returned an empty response');
   return text as string;
 }
+
+/**
+ * Fast generic Groq completion helper (supports JSON mode for structured Aura tasks).
+ */
+export async function groqComplete(
+  prompt: string,
+  opts?: { system?: string; jsonMode?: boolean; maxTokens?: number }
+): Promise<string> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error('GROQ_API_KEY not configured');
+
+  const body: Record<string, any> = {
+    model: 'llama-3.3-70b-versatile',
+    temperature: 0.3,
+    max_tokens: opts?.maxTokens ?? 700,
+    messages: [
+      ...(opts?.system ? [{ role: 'system', content: opts.system }] : []),
+      { role: 'user', content: String(prompt || '').slice(0, 6000) }
+    ]
+  };
+  if (opts?.jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000)
+  });
+
+  if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Groq returned an empty response');
+  return text as string;
+}

@@ -137,8 +137,196 @@ const CATALOG_VISUAL_DNA: Record<string, string> = {
   'pant-2.jpg': 'deep dark-wash midnight indigo slim-fit denim jeans trousers with clean tailoring and leather waistband patch',
   'pant-3.jpg': 'charcoal navy-black slim-fit tactical cargo trousers featuring a side thigh utility flap pocket with zipper and flexible stretch cuffs',
   'pant-4.jpg': 'olive green slim-fit utility cargo trousers with side flap pockets',
-  'pant-5.jpg': 'classic khaki-beige tailored cotton gabardine chino trousers'
+  'pant-5.jpg': 'classic khaki-beige tailored cotton gabardine chino trousers',
+
+  // Kids / Baby Collection & Formal Blazers/Suits (/products/baby-1..11.jpg)
+  'baby-1.jpg': 'tailored kids festive 3-piece outfit featuring a deep midnight navy-blue cotton Panjabi kurta and matching navy trousers worn under a sleeveless cream-beige textured Nehru waistcoat (Koti) with 4 dark buttons, welt pockets, and a navy pocket square',
+  'baby-2.jpg': 'pastel mint-sage silk festive Panjabi kurta with intricate cream-and-gold embroidery around the mandarin collar and placket with a beige pocket square, paired with cream-white pajama trousers',
+  'baby-3.jpg': 'pastel sage-mint cotton Panjabi kurta with a white-and-beige geometric embroidered button placket, chest pocket with printed pocket square, rolled-up sleeves, and matching sage-mint tailored trousers',
+  'baby-4.jpg': 'pastel blush-pink layered floral tulle party frock dress featuring a white floral lace Peter Pan collar, sheer 3/4 bell sleeves with white lace trim, and delicate pink-and-green floral embroidery across the tiered skirt',
+  'baby-5.jpg': 'deep emerald bottle-green chiffon party frock dress featuring gold-and-peach floral vine embroidery on the pleated bodice, white pearl buttons down the chest, flutter ruffle sleeves, and a large emerald satin bow with pearl brooch at the waist',
+  'baby-6.jpg': 'royal amethyst lavender-purple layered ruffle tulle party frock dress featuring 3D lavender floral appliqués with pearl centers on the bodice, sheer layered flutter sleeves, and a purple satin waist bow with pearl clasp',
+  'baby-7.jpg': 'soft peach-champagne floral embroidered layered tulle party frock dress featuring a white scalloped lace collar, sheer bell sleeves with lace trim, and delicate pastel pink rose embroidery across the tiered tulle skirt',
+  'baby-8.jpg': 'royal midnight navy-blue layered tulle party frock dress featuring a pleated sleeveless bodice with 3D navy floral pearl appliqués on the right shoulder and a large navy satin bow with crystal-pearl brooch at the waist',
+  'baby-9.jpg': 'sleek all-black tailored 3-piece formal suit featuring a single-breasted black blazer jacket with satin peak lapels and black pocket square, worn over a jet-black button-down dress shirt and tailored black formal trousers with a black leather belt',
+  'baby-10.jpg': 'classic all-black single-breasted formal tuxedo suit featuring a tailored black blazer with textured lapels and pocket square, worn over a black dress shirt and matching tailored black dress trousers',
+  'baby-11.jpg': 'smart-casual 2-piece outfit featuring a warm cream-beige linen-cotton mandarin-collar button-down shirt with dark contrast buttons and rolled-up sleeves, paired with dark chocolate-brown tailored chino trousers'
 };
+
+export type GarmentClass =
+  | 'saree'
+  | 'three-piece'
+  | 'borka'
+  | 'blazer'
+  | 'panjabi'
+  | 'pant'
+  | 'baby'
+  | 't-shirt'
+  | 'shirt'
+  | 'undergarments'
+  | 'other';
+
+/**
+ * Universal Garment Taxonomy Classifier for Current & Future Vendors (Bengali + English + Vision).
+ * Accurately categorizes Three-Piece, Saree, Jeans/Pant, Kids/Baby, Blazer/Suit/Koti, Borka/Abaya, Panjabi, T-Shirt, and Shirt.
+ */
+export function classifyGarmentCategory(
+  category = '',
+  productName = '',
+  productDesc = '',
+  visionCaption = '',
+  imageRef = ''
+): {
+  kind: GarmentClass;
+  vtonCategory: 'tops' | 'bottoms' | 'one-pieces';
+  leffaCategory: 'upper_body' | 'lower_body' | 'dresses';
+  catvtonCategory: 'upper' | 'lower' | 'overall';
+  isChildGarment: boolean;
+} {
+  const basename = (imageRef.split('/').pop() || '').split('?')[0].toLowerCase();
+  const combined = `${category} ${productName} ${productDesc} ${visionCaption} ${basename}`.toLowerCase();
+  const catOnly = `${category} ${productName}`.toLowerCase();
+
+  const isChildGarment =
+    /^baby-\d+\./i.test(basename) ||
+    /\b(baby|kids?|child|children|toddler|junior|infant|boy'?s|girl'?s|বেবি|বাচ্চা|বাচ্চাদের|শিশু|শিশুদের|ছোটদের|কিডস|ফ্রক|frock)\b/i.test(
+      catOnly
+    );
+
+  // 1. Saree / Shari
+  if (/\b(saree|sari|shari|jamdani|katan|muslin|benarasi|tangail|শাড়ি|শাড়ি|জামদানি|কাতান|মসলিন|তাঁত)\b/i.test(combined)) {
+    return {
+      kind: 'saree',
+      vtonCategory: 'one-pieces',
+      leffaCategory: 'dresses',
+      catvtonCategory: 'overall',
+      isChildGarment
+    };
+  }
+
+  // 2. Three-Piece / Salwar Kameez / Kurti Set
+  if (
+    /\b(three-?piece|3-?piece|salwar|shalwar|kameez|kamiz|kurti|lehenga|gharara|sharara|থ্রি-?পিস|থ্রিপিস|সালোয়ার|কামিজ|কুর্তি|লেহেঙ্গা|ওড়না)\b/i.test(
+      combined
+    )
+  ) {
+    return {
+      kind: 'three-piece',
+      vtonCategory: 'one-pieces',
+      leffaCategory: 'dresses',
+      catvtonCategory: 'overall',
+      isChildGarment
+    };
+  }
+
+  // 3. Borka / Abaya / Modest Gown
+  if (/\b(borka|burqa|abaya|hijab|khimar|jilbab|niqab|বোরকা|আবায়া|হিজাব|খিমার|জিলবাব)\b/i.test(combined)) {
+    return {
+      kind: 'borka',
+      vtonCategory: 'one-pieces',
+      leffaCategory: 'dresses',
+      catvtonCategory: 'overall',
+      isChildGarment
+    };
+  }
+
+  // 4. Blazer / Suit / Coat / Tuxedo / Sherwani / Waistcoat (Koti) / Jacket
+  if (
+    /\b(blazer|suit|tuxedo|coat|overcoat|sherwani|waistcoat|koti|nehru jacket|jacket|hoodie|cardigan|ব্লেজার|স্যুট|কোট|শেরওয়ানি|কটি|ওয়েস্টকোট|জ্যাকেট|হুডি)\b/i.test(
+      combined
+    )
+  ) {
+    const isFullSuit = /\b(suit|tuxedo|3-?piece|2-?piece|trouser|pant|স্যুট)\b/i.test(combined);
+    return {
+      kind: 'blazer',
+      vtonCategory: isFullSuit ? 'one-pieces' : 'tops',
+      leffaCategory: isFullSuit ? 'dresses' : 'upper_body',
+      catvtonCategory: isFullSuit ? 'overall' : 'upper',
+      isChildGarment
+    };
+  }
+
+  // 5. Kids / Baby Frocks & Full Sets
+  if (isChildGarment) {
+    const isBottomOnly = /\b(pant|jeans|trouser|প্যান্ট|জিন্স)\b/i.test(catOnly) && !/\b(shirt|top|panjabi|suit|set)\b/i.test(catOnly);
+    return {
+      kind: 'baby',
+      vtonCategory: isBottomOnly ? 'bottoms' : 'one-pieces',
+      leffaCategory: isBottomOnly ? 'lower_body' : 'dresses',
+      catvtonCategory: isBottomOnly ? 'lower' : 'overall',
+      isChildGarment: true
+    };
+  }
+
+  // 6. Jeans / Pants / Trousers / Bottoms
+  if (
+    /\b(pant|pants|jeans|denim|trouser|trousers|chino|chinos|cargo|gabardine|jogger|joggers|leggings|palazzo|페이জামা|প্যান্ট|জিন্স|গ্যাবার্ডিন|ট্রাউজার|কার্গো|চিনো|পালাজ্জো)\b/i.test(
+      catOnly
+    ) &&
+    !/\b(shirt|t-?shirt|panjabi|kurta|blazer|top)\b/i.test(catOnly)
+  ) {
+    return {
+      kind: 'pant',
+      vtonCategory: 'bottoms',
+      leffaCategory: 'lower_body',
+      catvtonCategory: 'lower',
+      isChildGarment: false
+    };
+  }
+
+  // 7. Panjabi / Kurta / Kabli
+  if (/\b(panjabi|punjabi|kurta|kabli|পাঞ্জাবি|পাঞ্জাবী|কুর্তা|কাবলি)\b/i.test(combined)) {
+    const hasPajamaSet = /\b(kabli|set|pajama|trouser|কাবলি|পায়জামা)\b/i.test(catOnly);
+    return {
+      kind: 'panjabi',
+      vtonCategory: hasPajamaSet ? 'one-pieces' : 'tops',
+      leffaCategory: hasPajamaSet ? 'dresses' : 'upper_body',
+      catvtonCategory: hasPajamaSet ? 'overall' : 'upper',
+      isChildGarment
+    };
+  }
+
+  // 8. Undergarments / Loungewear / Nightwear
+  if (/\b(undergarment|innerwear|nightwear|loungewear|sleepwear|lingerie|bra|brief|boxer|আন্ডারগার্মেন্ট|নাইটি|ইনারওয়্যার)\b/i.test(combined)) {
+    return {
+      kind: 'undergarments',
+      vtonCategory: 'one-pieces',
+      leffaCategory: 'dresses',
+      catvtonCategory: 'overall',
+      isChildGarment: false
+    };
+  }
+
+  // 9. T-Shirt / Henley / Polo (checked BEFORE generic shirt)
+  if (/\b(t-?shirt|tshirt|tee|henley|polo|টি-?শার্ট|টিশার্ট|গেঞ্জি|পোলো)\b/i.test(combined)) {
+    return {
+      kind: 't-shirt',
+      vtonCategory: 'tops',
+      leffaCategory: 'upper_body',
+      catvtonCategory: 'upper',
+      isChildGarment
+    };
+  }
+
+  // 10. Shirt (Formal / Casual / Button-down)
+  if (/\b(shirt|button-down|oxford|flannel|শার্ট)\b/i.test(combined)) {
+    return {
+      kind: 'shirt',
+      vtonCategory: 'tops',
+      leffaCategory: 'upper_body',
+      catvtonCategory: 'upper',
+      isChildGarment
+    };
+  }
+
+  return {
+    kind: 'other',
+    vtonCategory: 'tops',
+    leffaCategory: 'upper_body',
+    catvtonCategory: 'upper',
+    isChildGarment
+  };
+}
 
 // Banglish & Heritage Fashion Glossary for automatic prompt enrichment
 const BANGLISH_GLOSSARY: Record<string, string> = {
@@ -268,6 +456,49 @@ export async function prepareCleanGarmentBuffers(opts: {
         rawCap
       );
 
+    // Automatic Pixel-Level Retail Hang-Tag & Flat-Lay Detector for any future vendor upload
+    let autoDetectedFlatLayTag = false;
+    if (!isModelPhoto || (!hasLeftBanner && /shirt/i.test(catLower || basename))) {
+      try {
+        const { data: thumb } = await sharp(buffer)
+          .resize(40, 40, { fit: 'fill' })
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        // Check if top-left & top-right corners are clean studio background (no room/person head)
+        const lumAt = (x: number, y: number) => {
+          const idx = (y * 40 + x) * 3;
+          return 0.299 * thumb[idx] + 0.587 * thumb[idx + 1] + 0.114 * thumb[idx + 2];
+        };
+        const cornerLum = (lumAt(2, 2) + lumAt(37, 2)) / 2;
+        // Compare center chest hang-tag zone (x:18..22, y:14..21) against left/right chest fabric (x:11..15 & x:25..29, y:14..21)
+        let centerWhitePixels = 0;
+        let centerTotal = 0;
+        let sideLumSum = 0;
+        let sideTotal = 0;
+        for (let y = 14; y <= 21; y++) {
+          for (let x = 18; x <= 22; x++) {
+            const idx = (y * 40 + x) * 3;
+            const r0 = thumb[idx], g0 = thumb[idx + 1], b0 = thumb[idx + 2];
+            const l0 = (r0 + g0 + b0) / 3;
+            const d0 = Math.max(r0, g0, b0) - Math.min(r0, g0, b0);
+            if (l0 > 198 && d0 < 38) centerWhitePixels++;
+            centerTotal++;
+          }
+          for (const x of [11, 12, 13, 14, 25, 26, 27, 28]) {
+            sideLumSum += lumAt(x, y);
+            sideTotal++;
+          }
+        }
+        const avgSideLum = sideTotal ? sideLumSum / sideTotal : 200;
+        if (cornerLum > 175 && centerTotal > 0 && centerWhitePixels / centerTotal >= 0.22 && avgSideLum < 165) {
+          autoDetectedFlatLayTag = true;
+          isModelPhoto = false;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     // 1. Clean Portrait Buffer (removes left promotional text column, corner badges, wire hangers & retail price tags)
     let portraitBuf = buffer;
     if (/^tshirt-[1234]\.jpg$/i.test(basename)) {
@@ -280,7 +511,11 @@ export async function prepareCleanGarmentBuffers(opts: {
         })
         .jpeg({ quality: 92 })
         .toBuffer();
-    } else if (/^shirt-(?:[6789]|1[0123])\.jpg$/i.test(basename) || (!isModelPhoto && /\b(hanger|tag)\b/i.test(rawCap))) {
+    } else if (
+      /^shirt-(?:[6789]|1[0123])\.jpg$/i.test(basename) ||
+      autoDetectedFlatLayTag ||
+      (!isModelPhoto && /\b(hanger|tag|label)\b/i.test(rawCap))
+    ) {
       let workBuf = buffer;
       let curW = W;
       let curH = H;
@@ -351,14 +586,15 @@ export async function prepareCleanGarmentBuffers(opts: {
         .toBuffer();
     }
 
-    // 2. Clean Neck-Down Garment Zoom Buffer (crops out the reference model's face AND ad banner for top/shirt/t-shirt/panjabi diptych)
+    // 2. Clean Category-Aware Garment Zoom Buffer (crops out the reference model's face AND ad banner)
     let zoomBuf = portraitBuf;
-    const isUpperGarment = !/saree|shari|borka|abaya|three-?piece|kameez|pant|trouser|jeans/i.test(catLower);
-    if (isModelPhoto && isUpperGarment) {
+    const tax = classifyGarmentCategory(opts.category, basename, '', rawCap, effectiveRef);
+    if (isModelPhoto) {
       const left = hasLeftBanner ? Math.round(W * 0.43) : Math.round(W * 0.12);
       const width = hasLeftBanner ? Math.round(W * 0.46) : Math.round(W * 0.76);
-      const top = Math.round(H * 0.22);
-      const height = Math.round(H * 0.76);
+      // Lower body (Jeans/Pants) zooms into waist-to-ankle; Full ensembles (Saree/Three-Piece/Borka/Kids) keep neck-to-hem; Tops keep neck-to-hip
+      const top = tax.kind === 'pant' ? Math.round(H * 0.32) : tax.vtonCategory === 'one-pieces' ? Math.round(H * 0.18) : Math.round(H * 0.22);
+      const height = tax.kind === 'pant' ? Math.round(H * 0.65) : tax.vtonCategory === 'one-pieces' ? Math.round(H * 0.80) : Math.round(H * 0.76);
       if (left + width <= W && top + height <= H) {
         zoomBuf = await sharp(buffer)
           .extract({ left, top, width, height })
@@ -656,34 +892,50 @@ function buildExactTryOnPrompt(opts: {
   visualStructure: string;
   visionCaption: string;
   isCatalogExactMatch: boolean;
+  productImg?: string;
 }): string {
-  const { category, cleanName, cleanDesc, visualStructure, visionCaption, isCatalogExactMatch } = opts;
-  const catLower = category.toLowerCase();
+  const { category, cleanName, cleanDesc, visualStructure, visionCaption, isCatalogExactMatch, productImg } = opts;
+  const tax = classifyGarmentCategory(category, cleanName, cleanDesc, `${visualStructure} ${visionCaption}`, productImg);
 
   let removalClause =
-    "Completely replace the person's current clothing (removing any suit jacket, blazer, coat, or previous top)";
+    "Completely replace the person's current clothing (removing any previous suit jacket, blazer, coat, or top)";
   let fitClause = 'fitted naturally with realistic fabric folds, neckline, sleeves, and studio lighting';
 
-  if (/saree|shari/i.test(catLower)) {
+  if (tax.kind === 'saree') {
+    removalClause = "Completely replace the person's current outfit with this authentic Bangladeshi Saree ensemble";
     fitClause =
-      'draped in traditional Bangladeshi Nivi saree style with pleated front, matching fitted blouse, and ornate pallu draped over the shoulder';
-  } else if (/panjabi/i.test(catLower)) {
+      'draped in traditional Bangladeshi Nivi saree style — faithfully reproducing the exact woven/embroidered anchal (pallu) draped over the left shoulder, the exact par (border) running along the lower hem and front pleats, the exact body fabric motifs, and the matching fitted blouse';
+  } else if (tax.kind === 'three-piece') {
+    removalClause =
+      "Completely replace the person's current outfit with this complete Bangladeshi Three-Piece Salwar Kameez ensemble";
     fitClause =
-      'tailored as a Bangladeshi men Panjabi tunic kurta with embroidered mandarin collar and chest button placket';
-  } else if (/borka|abaya/i.test(catLower)) {
-    fitClause = 'styled as a modest full-length flowing luxury Abaya Borka gown';
-  } else if (/three-?piece|kameez/i.test(catLower)) {
+      'styled as an authentic Bangladeshi three-piece salwar kameez suit — faithfully reproducing the exact embroidered/printed long kameez tunic neckline, sleeves, and daman hem border, the matching salwar/trousers, and the matching dupatta scarf draped gracefully across the chest and shoulder';
+  } else if (tax.kind === 'borka') {
+    removalClause = "Completely replace the person's current outfit with this modest Abaya Borka ensemble";
     fitClause =
-      'styled as a Bangladeshi embroidered three-piece salwar kameez tunic with matching trousers and draped dupatta scarf';
-  } else if (/t-?shirt/i.test(catLower)) {
+      'styled as a modest full-length flowing luxury Abaya Borka gown with exact front/sleeve beadwork embroidery and matching draped hijab';
+  } else if (tax.kind === 'blazer') {
+    removalClause = "Dress the person in this tailored formal Blazer / Suit / Waistcoat outerwear ensemble";
+    fitClause =
+      'tailored sharply over the shoulders and torso with crisp lapels, structured chest, pocket square, button closure, and sleeves matching the exact reference blazer/suit/waistcoat';
+  } else if (tax.kind === 'baby') {
+    removalClause = "Completely replace the child/model's current outfit";
+    fitClause =
+      'proportioned naturally and comfortably as a premium kids/children outfit, preserving every exact detail of the party frock/ruffles/bow or kids panjabi/waistcoat/suit set';
+  } else if (tax.kind === 'panjabi') {
+    fitClause =
+      'tailored as a Bangladeshi luxury men Panjabi tunic kurta with exact embroidered mandarin collar, chest button placket, and sleeve cuffs';
+  } else if (tax.kind === 'pant') {
+    removalClause =
+      "Replace ONLY the person's lower-body trousers/pants/jeans while keeping their upper-body top/shirt, face, hands, and background untouched";
+    fitClause =
+      'tailored naturally from the waistband down the legs with authentic denim/gabardine/cotton fabric wash, pockets, stitching, and ankle hem';
+  } else if (tax.kind === 't-shirt') {
     fitClause =
       'worn as a standalone short-sleeve t-shirt on the torso with bare forearms visible (completely remove any suit jacket, blazer, or long-sleeve outer coat)';
-  } else if (/shirt/i.test(catLower)) {
+  } else if (tax.kind === 'shirt') {
     fitClause =
       'worn as a standalone button-down shirt with visible collar, buttons, full pattern across the chest and sleeves, and cuffs (completely remove any suit jacket, blazer, or outer coat)';
-  } else if (/pant|trouser|jeans/i.test(catLower)) {
-    removalClause = "Replace the person's lower-body trousers/pants";
-    fitClause = 'tailored naturally on the lower body with realistic denim/cotton folds';
   }
 
   if (isCatalogExactMatch && visualStructure) {
@@ -798,15 +1050,11 @@ export async function tryOnWithFashnVton(opts: {
   userImg: string;
   productImg: string;
   category?: string;
+  productName?: string;
   isModelPhoto?: boolean;
 }): Promise<string | null> {
-  const catLower = (opts.category || '').toLowerCase();
-  let vtonCategory: 'tops' | 'bottoms' | 'one-pieces' = 'tops';
-  if (/pant|trouser|jeans|salwar|pajama/i.test(catLower)) {
-    vtonCategory = 'bottoms';
-  } else if (/saree|shari|borka|abaya|three-?piece|kameez|dress|gown/i.test(catLower)) {
-    vtonCategory = 'one-pieces';
-  }
+  const tax = classifyGarmentCategory(opts.category, opts.productName, '', '', opts.productImg);
+  const vtonCategory = tax.vtonCategory;
 
   const photoType: 'model' | 'flat-lay' = opts.isModelPhoto ? 'model' : 'flat-lay';
 
@@ -865,17 +1113,11 @@ export async function tryOnWithLeffaVton(opts: {
   userImg: string;
   productImg: string;
   category?: string;
+  productName?: string;
 }): Promise<string | null> {
-  const catLower = (opts.category || '').toLowerCase();
-  let garmentType: 'upper_body' | 'lower_body' | 'dresses' = 'upper_body';
-  let modelType: 'viton_hd' | 'dress_code' = 'viton_hd';
-  if (/pant|trouser|jeans|salwar|pajama/i.test(catLower)) {
-    garmentType = 'lower_body';
-    modelType = 'dress_code';
-  } else if (/saree|shari|borka|abaya|three-?piece|kameez|dress|gown/i.test(catLower)) {
-    garmentType = 'dresses';
-    modelType = 'dress_code';
-  }
+  const tax = classifyGarmentCategory(opts.category, opts.productName, '', '', opts.productImg);
+  const garmentType = tax.leffaCategory;
+  const modelType: 'viton_hd' | 'dress_code' = garmentType === 'upper_body' ? 'viton_hd' : 'dress_code';
 
   const uploadOne = async (ref: string, label: string) => {
     const { buffer, mimeType, ext } = await resolveImageBuffer(ref);
@@ -933,14 +1175,10 @@ export async function tryOnWithCatVtonFlux(opts: {
   userImg: string;
   productImg: string;
   category?: string;
+  productName?: string;
 }): Promise<string | null> {
-  const catLower = (opts.category || '').toLowerCase();
-  let clothType: 'upper' | 'lower' | 'overall' = 'upper';
-  if (/pant|trouser|jeans|salwar|pajama/i.test(catLower)) {
-    clothType = 'lower';
-  } else if (/saree|shari|borka|abaya|three-?piece|kameez|dress|gown/i.test(catLower)) {
-    clothType = 'overall';
-  }
+  const tax = classifyGarmentCategory(opts.category, opts.productName, '', '', opts.productImg);
+  const clothType = tax.catvtonCategory;
 
   const uploadOne = async (ref: string, label: string) => {
     const { buffer, mimeType, ext } = await resolveImageBuffer(ref);
@@ -1144,7 +1382,8 @@ export async function tryOnGarmentFree(opts: {
     cleanDesc,
     visualStructure,
     visionCaption: visionData.cleanGarmentCaption,
-    isCatalogExactMatch: visionData.isCatalogExactMatch
+    isCatalogExactMatch: visionData.isCatalogExactMatch,
+    productImg: opts.productImg
   });
 
   const garmentDetailsSummary =
@@ -1156,6 +1395,7 @@ export async function tryOnGarmentFree(opts: {
       userImg: opts.userImg,
       productImg: cleanGarments.cleanPortraitDataUrl,
       category: cat,
+      productName: cleanName,
       isModelPhoto: cleanGarments.isModelPhoto
     });
   }
@@ -1183,6 +1423,7 @@ export async function tryOnGarmentFree(opts: {
       userImg: opts.userImg,
       productImg: cleanGarments.cleanPortraitDataUrl,
       category: cat,
+      productName: cleanName,
       isModelPhoto: cleanGarments.isModelPhoto
     });
     if (vtonOut) return vtonOut;
@@ -1195,7 +1436,8 @@ export async function tryOnGarmentFree(opts: {
     const leffaOut = await tryOnWithLeffaVton({
       userImg: opts.userImg,
       productImg: cleanGarments.cleanPortraitDataUrl,
-      category: cat
+      category: cat,
+      productName: cleanName
     });
     if (leffaOut) return leffaOut;
   } catch (e: any) {
@@ -1207,7 +1449,8 @@ export async function tryOnGarmentFree(opts: {
     const catOut = await tryOnWithCatVtonFlux({
       userImg: opts.userImg,
       productImg: cleanGarments.cleanPortraitDataUrl,
-      category: cat
+      category: cat,
+      productName: cleanName
     });
     if (catOut) return catOut;
   } catch (e: any) {

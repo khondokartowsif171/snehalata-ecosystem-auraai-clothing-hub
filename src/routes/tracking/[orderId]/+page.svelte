@@ -79,29 +79,74 @@
     }
   }
 
-  async function playStatusBriefing() {
-    if (!order || isSpeaking) return;
-    isSpeaking = true;
-    const text = `আসসালামু আলাইকুম। আপনার অর্ডার ${order.id} বর্তমানে ${order.currentStatus} পর্যায়ে আছে। এটি ${order.estimatedDelivery}-এর মধ্যে আপনার ঠিকানায় পৌঁছাবে বলে আশা করা হচ্ছে।`;
+  let activeAudio: HTMLAudioElement | null = null;
 
-    const base64 = await generateAuraSpeech(text);
-    if (base64) {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const dataInt16 = new Int16Array(bytes.buffer);
-      const buffer = audioCtx.createBuffer(1, dataInt16.length, 24000);
-      const channelData = buffer.getChannelData(0);
-      for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
-      const source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioCtx.destination);
-      source.onended = () => isSpeaking = false;
-      source.start();
-    } else {
-      isSpeaking = false;
+  function fallbackBrowserSpeech(text: string) {
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'bn-BD';
+        u.rate = 0.95;
+        u.onend = () => { isSpeaking = false; };
+        u.onerror = () => { isSpeaking = false; };
+        window.speechSynthesis.speak(u);
+        return;
+      }
+    } catch {
+      // ignore
     }
+    isSpeaking = false;
+  }
+
+  async function playStatusBriefing() {
+    if (!order) return;
+    if (isSpeaking) {
+      try {
+        activeAudio?.pause();
+        activeAudio = null;
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+      } catch {}
+      isSpeaking = false;
+      return;
+    }
+
+    isSpeaking = true;
+    const statusBn = STATUS_LABEL[order.currentStatus] || order.currentStatus;
+    const descBn = (STATUS_DESC[order.currentStatus] || '').replace('✓', '').trim();
+    const text = `আসসালামু আলাইকুম। স্নেহলতা নিউরাল হাব থেকে জানানো যাচ্ছে, আপনার অর্ডার ${order.id} বর্তমানে ${statusBn} পর্যায়ে আছে। ${descBn ? descBn + '।' : ''} এটি ${order.estimatedDelivery}-এর মধ্যে আপনার ঠিকানায় পৌঁছাবে বলে আশা করা হচ্ছে। স্নেহলতার সাথে থাকার জন্য ধন্যবাদ।`;
+
+    try {
+      const base64 = await generateAuraSpeech(text);
+      if (base64) {
+        if (base64.startsWith('data:audio/')) {
+          const audio = new Audio(base64);
+          activeAudio = audio;
+          audio.onended = () => { isSpeaking = false; activeAudio = null; };
+          audio.onerror = () => { activeAudio = null; fallbackBrowserSpeech(text); };
+          await audio.play();
+          return;
+        } else {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const dataInt16 = new Int16Array(bytes.buffer);
+          const buffer = audioCtx.createBuffer(1, dataInt16.length, 24000);
+          const channelData = buffer.getChannelData(0);
+          for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+          source.onended = () => { isSpeaking = false; };
+          source.start();
+          return;
+        }
+      }
+    } catch {
+      // Fall through to browser speech synthesis
+    }
+    fallbackBrowserSpeech(text);
   }
 </script>
 
@@ -145,10 +190,16 @@
         <div class="lg:col-span-4 space-y-8">
           <div class="bg-aura-glass border border-aura-glassBorder rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
             <div class="flex items-center justify-between mb-10">
-              <h2 class="text-xl font-serif font-bold text-white">অর্ডার অগ্রগতি <span class="text-aura-green">· Progress</span></h2>
-              <button onclick={playStatusBriefing} disabled={isSpeaking}
-                class="p-3 rounded-xl transition-all cursor-pointer {isSpeaking ? 'bg-aura-green text-white animate-pulse' : 'bg-white/5 text-aura-green border border-aura-green/20 hover:bg-aura-green hover:text-white'}">
+              <div>
+                <h2 class="text-xl font-serif font-bold text-white">অর্ডার অগ্রগতি <span class="text-aura-green">· Progress</span></h2>
+                {#if isSpeaking}
+                  <p class="text-[11px] font-bold text-aura-green animate-pulse mt-1">🔊 বাংলায় অর্ডার আপডেট শোনানো হচ্ছে...</p>
+                {/if}
+              </div>
+              <button type="button" onclick={playStatusBriefing} title="বাংলায় অর্ডার স্ট্যাটাস শুনুন" aria-label="বাংলায় অর্ডার স্ট্যাটাস শুনুন"
+                class="p-3 rounded-xl transition-all cursor-pointer flex items-center gap-2 {isSpeaking ? 'bg-aura-green text-black shadow-[0_0_20px_rgba(16,185,129,0.6)] animate-pulse' : 'bg-white/5 text-aura-green border border-aura-green/20 hover:bg-aura-green hover:text-black'}">
                 <Volume2 size={20} />
+                {#if isSpeaking}<span class="text-[10px] font-black uppercase">থামুন</span>{/if}
               </button>
             </div>
 
