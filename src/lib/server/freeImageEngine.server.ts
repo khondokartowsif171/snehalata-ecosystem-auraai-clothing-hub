@@ -20,7 +20,7 @@ const CATALOG_VISUAL_DNA: Record<string, string> = {
   'shirt-3.jpg': 'solid olive sage green textured cotton formal button-down shirt with classic collar and dark buttons',
   'shirt-4.jpg': 'solid warm cream ivory beige textured cotton formal button-down shirt with classic collar and light buttons',
   'shirt-5.jpg': 'solid sky blue micro-textured cotton formal button-down shirt with white buttons and classic collar',
-  'shirt-6.jpg': 'jet-black casual button-down shirt featuring bold vertical white geometric and tribal ornamental stripe bands running vertically down the entire front chest, shoulders, and sleeves, with rolled-up grey-and-white patterned cuffs',
+  'shirt-6.jpg': 'jet-black casual button-down shirt covered edge-to-edge in repeating parallel vertical columns of intricate crisp white geometric tribal and floral embroidery motifs across the entire chest, torso, shoulders, and both sleeves, with rolled-up grey-and-white patterned cuffs',
   'shirt-7.jpg': 'ice-blue / light slate-blue casual button-down shirt featuring subtle white ornamental paisley and floral filigree motifs across the fabric and white rolled-up cuffs',
   'shirt-8.jpg': 'jet-black casual button-down shirt covered in large high-contrast crisp white hibiscus flower and leaf floral prints across the chest and sleeves, with solid white rolled-up cuffs',
   'shirt-9.jpg': 'jet-black casual button-down shirt covered in intricate golden-brown, bronze, and tan paisley ornamental prints all over the torso and sleeves, with crisp white rolled-up cuffs',
@@ -28,12 +28,20 @@ const CATALOG_VISUAL_DNA: Record<string, string> = {
   'shirt-11.jpg': 'white, grey, and soft blush-pink tie-dye gradient casual button-down shirt with bold white stencil typography lettering print across the chest and dual flap chest pockets with white rolled cuffs',
   'shirt-12.jpg': 'dark maroon streetwear utility button-down shirt featuring bold black-and-white horizontal text tape across the chest, white graphic patch on right pocket, and white SIX patch on left pocket',
   'shirt-13.jpg': 'white casual button-down shirt with horizontal coral-pink and grey abstract tie-dye brush stroke bands across the shoulders, chest, and hem, dual chest flap pockets, and white rolled cuffs',
+  'tshirt-1.jpg': 'olive army green waffle-knit short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar placket and sleeve cuffs',
+  'tshirt-2.jpg': 'deep forest bottle-green textured short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar placket and sleeve cuffs',
+  'tshirt-3.jpg': 'deep forest bottle-green textured short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar placket and sleeve cuffs',
   'saree-1.jpg': 'midnight navy blue handwoven Jamdani silk saree with antique copper-gold zari geometric border, red-and-gold floral buti motifs on the pallu, and matching navy blue blouse',
   'saree-2.jpg': 'traditional Tangail handloom cotton saree with intricate woven heritage border and geometric motifs',
   'saree-3.jpg': 'royal sapphire blue pure silk Jamdani saree with shimmering silver-and-gold zari border and woven floral motifs across the pallu and pleats',
   'threepiece-1.jpg': 'deep wine-purple embroidered long kameez tunic with copper-gold neckline and hem embroidery, matching wine-purple straight trousers, and a wine-purple dupatta scarf with ornate gold border',
+  'threepiece-2.jpg': 'slate denim-blue embroidered long kameez tunic with ornate copper-red and gold floral embroidery on the neckline and hem border, matching blue straight trousers, and matching blue dupatta scarf with copper-gold border',
   'panjabi-1.jpg': 'tailored Bangladeshi luxury men Panjabi kurta tunic in deep navy blue with intricate tonal blue geometric embroidery along the mandarin collar and chest placket',
-  'panjabi-2.jpg': 'tailored Bangladeshi luxury men Panjabi kurta tunic with intricate embroidered mandarin collar and chest placket'
+  'panjabi-2.jpg': 'tailored Bangladeshi luxury men Panjabi kurta tunic with intricate embroidered mandarin collar and chest placket',
+  'panjabi-3.jpg': 'crimson red men Panjabi kurta tunic covered all over in bold black abstract vertical and horizontal brush-stroke hatch patterns with a black-trimmed mandarin collar and metal buttons',
+  'panjabi-4.jpg': 'crimson red men Panjabi kurta tunic covered in repeating golden-beige rectangular geometric block-print motifs across the torso and sleeves with an ornate embroidered mandarin collar',
+  'panjabi-5.jpg': 'cream off-white men Panjabi kurta tunic covered in vibrant crimson-red and mustard-yellow pinwheel floral swirl prints across the entire fabric with a red-trimmed mandarin collar',
+  'panjabi-6.jpg': 'rich teal-blue men Panjabi kurta tunic with subtle self-textured weave and intricate tonal teal geometric embroidery on the mandarin collar and chest button placket'
 };
 
 // Banglish & Heritage Fashion Glossary for automatic prompt enrichment
@@ -274,6 +282,10 @@ function extractGradioCompleteJson(sseText: string): any {
  * Inspect the actual product image visually using Florence-2-Large Vision.
  */
 export async function describeGarmentImageVisually(productImgRef: string): Promise<string> {
+  const basename = (productImgRef.split('/').pop() || '').split('?')[0].toLowerCase();
+  if (CATALOG_VISUAL_DNA[basename]) {
+    return CATALOG_VISUAL_DNA[basename];
+  }
   try {
     const { buffer, mimeType, ext } = await resolveImageBuffer(productImgRef);
     const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
