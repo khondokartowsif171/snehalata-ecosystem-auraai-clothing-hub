@@ -268,7 +268,7 @@ export async function prepareCleanGarmentBuffers(opts: {
         rawCap
       );
 
-    // 1. Clean Portrait Buffer (removes left promotional text column & corner badges so VTON/Multi-Image engines see ONLY the garment)
+    // 1. Clean Portrait Buffer (removes left promotional text column, corner badges, wire hangers & retail price tags)
     let portraitBuf = buffer;
     if (/^tshirt-[1234]\.jpg$/i.test(basename)) {
       portraitBuf = await sharp(buffer)
@@ -278,6 +278,69 @@ export async function prepareCleanGarmentBuffers(opts: {
           width: Math.round(W * 0.56),
           height: Math.round(H * 0.92)
         })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+    } else if (/^shirt-(?:[6789]|1[0123])\.jpg$/i.test(basename) || (!isModelPhoto && /\b(hanger|tag)\b/i.test(rawCap))) {
+      let workBuf = buffer;
+      let curW = W;
+      let curH = H;
+
+      // shirt-12.jpg is a side-by-side Front (left 50%) + Back (right 50%) image
+      if (basename === 'shirt-12.jpg') {
+        workBuf = await sharp(workBuf)
+          .extract({ left: 0, top: 0, width: Math.round(curW * 0.50), height: curH })
+          .toBuffer();
+        const m2 = await sharp(workBuf).metadata();
+        curW = m2.width || Math.round(W * 0.50);
+        curH = m2.height || H;
+      }
+
+      // Sample top-left background color
+      const { data: bgData } = await sharp(workBuf)
+        .extract({ left: 8, top: 8, width: 16, height: 16 })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let r = 0, g = 0, b = 0;
+      const n = Math.max(1, bgData.length / 3);
+      for (let i = 0; i < bgData.length; i += 3) {
+        r += bgData[i];
+        g += bgData[i + 1];
+        b += bgData[i + 2];
+      }
+      r = Math.round(r / n);
+      g = Math.round(g / n);
+      b = Math.round(b / n);
+
+      // Heal center chest retail price hang-tag (x: 42.5%..57.5%, y: 32%..55%) using clean lower placket patch (y: 62%..85%)
+      const patchW = Math.round(curW * 0.15);
+      const patchH = Math.round(curH * 0.23);
+      const patchX = Math.round(curW * 0.425);
+      const cleanPlacketPatch = await sharp(workBuf)
+        .extract({ left: patchX, top: Math.round(curH * 0.62), width: patchW, height: patchH })
+        .toBuffer();
+
+      // Carve clean open V-neck collar opening (removes wire hanger + high back-collar inner band + white inner neck label)
+      const pts = [
+        `0,0`,
+        `${curW},0`,
+        `${curW},${Math.round(curH * 0.09)}`,
+        `${Math.round(curW * 0.565)},${Math.round(curH * 0.11)}`,
+        `${Math.round(curW * 0.545)},${Math.round(curH * 0.23)}`,
+        `${Math.round(curW * 0.50)},${Math.round(curH * 0.285)}`,
+        `${Math.round(curW * 0.455)},${Math.round(curH * 0.23)}`,
+        `${Math.round(curW * 0.435)},${Math.round(curH * 0.11)}`,
+        `0,${Math.round(curH * 0.09)}`
+      ].join(' ');
+
+      const vNeckSvg = Buffer.from(
+        `<svg width="${curW}" height="${curH}" xmlns="http://www.w3.org/2000/svg"><polygon points="${pts}" fill="rgb(${r},${g},${b})" /></svg>`
+      );
+
+      portraitBuf = await sharp(workBuf)
+        .composite([
+          { input: cleanPlacketPatch, left: patchX, top: Math.round(curH * 0.32) },
+          { input: vNeckSvg, left: 0, top: 0 }
+        ])
         .jpeg({ quality: 92 })
         .toBuffer();
     } else if (hasLeftBanner) {
