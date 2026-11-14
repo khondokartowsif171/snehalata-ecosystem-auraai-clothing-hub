@@ -1,20 +1,30 @@
 import { json } from '@sveltejs/kit';
 import * as gemini from '$lib/server/gemini.server';
+import { applyStyleTransferFree } from '$lib/server/freeImageEngine.server';
 
-// Image generation + 503-retries can take a while — give the function room.
 export const config = { maxDuration: 60 };
 
 export const POST = async ({ request }) => {
   try {
     const { image, style } = await request.json();
-    const data = await gemini.generateStyleTransfer(image, style);
-    if (!data) return json({ error: 'busy', message: 'Aura could not process that image — please try a clearer photo.' });
-    return json({ image: `data:image/png;base64,${data}` });
-  } catch (error: any) {
-    const m = String(error?.message || '');
-    if (/RESOURCE_EXHAUSTED|429|quota|limit:\s*0|billing/i.test(m)) {
-      return json({ error: 'quota', message: 'Aura Vision image editing needs Gemini image billing enabled on the API key (free tier allows 0 image generations). Once billing is on, it works instantly.' });
+    if (!image || !style) {
+      return json({ error: 'input', message: 'অনুগ্রহ করে একটি ছবি এবং স্টাইল নির্বাচন করুন।' });
     }
-    return json({ error: 'busy', message: 'Aura Vision is very busy right now — please try again in a few seconds.' });
+
+    // 1) Free Neural Engine (FLUX.1 Kontext Dev — 100% Free, Zero Quota Limits)
+    try {
+      const freeOut = await applyStyleTransferFree(image, String(style));
+      if (freeOut) return json({ image: freeOut, engine: 'flux-kontext-free' });
+    } catch (e: any) {
+      console.warn('[style-transfer] Free Kontext engine failed, trying Gemini fallback:', e?.message);
+    }
+
+    // 2) Gemini fallback
+    const data = await gemini.generateStyleTransfer(image, style);
+    if (data) return json({ image: `data:image/png;base64,${data}`, engine: 'gemini' });
+
+    return json({ error: 'busy', message: 'Aura ছবিটি প্রসেস করতে পারেনি — অনুগ্রহ করে একটু পর আবার চেষ্টা করুন।' });
+  } catch {
+    return json({ error: 'busy', message: 'Aura Vision এখন ব্যস্ত — অনুগ্রহ করে কয়েক সেকেন্ড পর আবার চেষ্টা করুন।' });
   }
 };

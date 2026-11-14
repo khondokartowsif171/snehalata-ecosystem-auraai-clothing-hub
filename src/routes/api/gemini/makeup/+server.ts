@@ -1,8 +1,7 @@
 import { json } from '@sveltejs/kit';
 import * as gemini from '$lib/server/gemini.server';
+import { applyMakeupFree } from '$lib/server/freeImageEngine.server';
 
-// Cosmetics try-on (selfie + shade → recoloured lips/cheeks/eyes). Single-image edit, so
-// it's the reliable Gemini path. maxDuration for the image generation.
 export const config = { maxDuration: 60 };
 
 export const POST = async ({ request }: { request: Request }) => {
@@ -10,16 +9,23 @@ export const POST = async ({ request }: { request: Request }) => {
   if (!selfie || !shade) {
     return json({ error: 'input', message: 'সেলফি ও একটি শেড — দুটোই দরকার।' });
   }
+
+  // 1) Free Neural Engine (FLUX.1 Kontext Dev — 100% Free, Zero Quota Limits)
+  try {
+    const freeOut = await applyMakeupFree(selfie, String(shade), String(kind || 'lipstick'));
+    if (freeOut) return json({ image: freeOut, engine: 'flux-kontext-free' });
+  } catch (e: any) {
+    console.warn('[makeup] Free Kontext engine failed, trying Gemini fallback:', e?.message);
+  }
+
+  // 2) Gemini fallback
   try {
     const data = await gemini.generateMakeupTryOn(selfie, String(shade), String(kind || 'lipstick'));
-    if (data) return json({ image: `data:image/png;base64,${data}` });
+    if (data) return json({ image: `data:image/png;base64,${data}`, engine: 'gemini' });
   } catch (e: any) {
-    const m = String(e?.message || '');
-    if (/RESOURCE_EXHAUSTED|429|quota|limit:\s*0|billing/i.test(m)) {
-      return json({ error: 'busy', message: 'Aura Vision এখন খুব ব্যস্ত (AI image quota) — একটু পরে আবার চেষ্টা করুন।' });
-    }
-    console.error('[makeup] endpoint error:', m);
+    console.warn('[makeup] Gemini fallback failed:', e?.message);
   }
+
   return json({
     error: 'busy',
     message: 'Aura সেলফিটা পরিষ্কারভাবে পড়তে পারেনি — মুখ স্পষ্ট দেখা যায় এমন একটা সেলফি দিন।'
