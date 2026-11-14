@@ -324,14 +324,12 @@
 
       if (activeTool === 'TRYON') {
         if (selectedProduct && capturedImage) {
-          const colorHint = await sampleProductColorClient(selectedProduct.imageUrl || '');
           const transformed = await generateTryOnTransformation(
             capturedImage,
             selectedProduct.imageUrl!,
             selectedProduct.category,
             selectedProduct.name,
-            selectedProduct.description,
-            colorHint
+            selectedProduct.description
           );
           if (transformed.image) {
             result = {

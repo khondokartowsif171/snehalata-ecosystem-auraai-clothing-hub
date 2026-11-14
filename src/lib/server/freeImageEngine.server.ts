@@ -1,47 +1,90 @@
-// Free Neural Image Engine for Snehalata Aura Studio
-// Powered by Official Zero-Cost Gradio Spaces + DeepSeek V3 Prompt Synthesis:
+// Free Neural Image & 2-Image Visual Try-On Engine for Snehalata Aura Studio
+// Powered by Official Zero-Cost Gradio Spaces:
 // 1. FLUX.1 Kontext Dev (black-forest-labs-flux-1-kontext-dev.hf.space) — In-Context Virtual Try-On, Makeup, Style Transfer & Image Remix
 // 2. Florence-2 Large Vision Analyzer (prithivmlmods-florence-2-image-caption.hf.space) — Real-time Visual Garment Inspection (Pattern, Print, Collar, Cuffs & Cut)
-// 3. Multi-Cluster Spatial Color & Pattern Histogram Analyzer — Prevents black+white->grey averaging and detects vertical stripes, floral prints, paisley, or solid weave
+// 3. FASHN VTON 1.5 (fashn-ai-fashn-vton-1-5.hf.space) & Qwen-Image-Edit-2511 (linoyts-qwen-image-edit-2511-fast.hf.space) — 2-Image Garment Transfer
 // 4. FLUX.1 Schnell & FLUX.1 Merged HD — 100% Free Text-to-Image Generation
 
 const SITE_ORIGIN = 'https://www.snehalata.com';
 
 const KONTEXT_SPACE = 'https://black-forest-labs-flux-1-kontext-dev.hf.space';
 const FLORENCE_SPACE = 'https://prithivmlmods-florence-2-image-caption.hf.space';
+const FASHN_VTON_SPACE = 'https://fashn-ai-fashn-vton-1-5.hf.space';
+const QWEN_EDIT_SPACE = 'https://linoyts-qwen-image-edit-2511-fast.hf.space';
 const SCHNELL_SPACE = 'https://black-forest-labs-flux-1-schnell.hf.space';
 const MERGED_SPACE = 'https://multimodalart-flux-1-merged.hf.space';
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || 'sk-bdd262d3ad024f7ea3af475a6b60005e';
 
-// Exact Visual DNA signatures for showcase catalog items in /products/*
+// Exact Visual DNA signatures for showcase & Supabase catalog items (keyed by filename)
+// Ensures 100% pixel-faithful garment reproduction even when DB titles are generic or mismatched.
 const CATALOG_VISUAL_DNA: Record<string, string> = {
-  'shirt-1.jpg': 'solid deep burgundy maroon premium cotton formal button-down shirt with classic collar, dark maroon buttons, and small gold emblem on chest',
-  'shirt-2.jpg': 'solid dark midnight navy blue textured cotton formal button-down shirt with classic collar and matching dark buttons',
-  'shirt-3.jpg': 'solid olive sage green textured cotton formal button-down shirt with classic collar and dark buttons',
-  'shirt-4.jpg': 'solid warm cream ivory beige textured cotton formal button-down shirt with classic collar and light buttons',
-  'shirt-5.jpg': 'solid sky blue micro-textured cotton formal button-down shirt with white buttons and classic collar',
-  'shirt-6.jpg': 'jet-black casual button-down shirt covered edge-to-edge in repeating parallel vertical columns of intricate crisp white geometric tribal and floral embroidery motifs across the entire chest, torso, shoulders, and both sleeves, with rolled-up grey-and-white patterned cuffs',
-  'shirt-7.jpg': 'ice-blue / light slate-blue casual button-down shirt featuring subtle white ornamental paisley and floral filigree motifs across the fabric and white rolled-up cuffs',
-  'shirt-8.jpg': 'jet-black casual button-down shirt covered in large high-contrast crisp white hibiscus flower and leaf floral prints across the chest and sleeves, with solid white rolled-up cuffs',
-  'shirt-9.jpg': 'jet-black casual button-down shirt covered in intricate golden-brown, bronze, and tan paisley ornamental prints all over the torso and sleeves, with crisp white rolled-up cuffs',
+  // 13 Showcase Shirts (/products/shirt-1.jpg .. shirt-13.jpg)
+  'shirt-1.jpg': 'solid deep burgundy maroon premium cotton formal long-sleeve button-down shirt with classic collar, dark maroon buttons, and a small gold chest emblem',
+  'shirt-2.jpg': 'solid dark midnight navy blue textured cotton formal long-sleeve button-down shirt with classic collar and matching dark buttons',
+  'shirt-3.jpg': 'solid olive sage green textured cotton formal long-sleeve button-down shirt with classic collar and dark buttons',
+  'shirt-4.jpg': 'solid warm cream ivory beige textured cotton formal long-sleeve button-down shirt with classic collar and light buttons',
+  'shirt-5.jpg': 'solid sky blue micro-textured cotton formal long-sleeve button-down shirt with white buttons and classic collar',
+  'shirt-6.jpg': 'jet-black casual long-sleeve button-down shirt covered edge-to-edge in repeating parallel vertical columns of intricate crisp white geometric tribal and floral embroidery motifs across the entire chest, torso, shoulders, and both sleeves, with rolled-up grey-and-white patterned cuffs',
+  'shirt-7.jpg': 'ice-blue / light slate-blue casual long-sleeve button-down shirt featuring subtle white ornamental paisley and floral filigree motifs across the fabric and crisp white rolled-up cuffs',
+  'shirt-8.jpg': 'jet-black casual long-sleeve button-down shirt covered in large high-contrast crisp white hibiscus flower and leaf floral prints across the chest and sleeves, with solid white rolled-up cuffs',
+  'shirt-9.jpg': 'jet-black casual long-sleeve button-down shirt covered in intricate golden-brown, bronze, and tan paisley ornamental prints all over the torso and sleeves, with crisp white rolled-up cuffs',
   'shirt-10.jpg': 'deep maroon wine casual button-down shirt with two embossed geometric textured chest pockets, black buttons, and rolled-up sleeves',
   'shirt-11.jpg': 'white, grey, and soft blush-pink tie-dye gradient casual button-down shirt with bold white stencil typography lettering print across the chest and dual flap chest pockets with white rolled cuffs',
   'shirt-12.jpg': 'dark maroon streetwear utility button-down shirt featuring bold black-and-white horizontal text tape across the chest, white graphic patch on right pocket, and white SIX patch on left pocket',
   'shirt-13.jpg': 'white casual button-down shirt with horizontal coral-pink and grey abstract tie-dye brush stroke bands across the shoulders, chest, and hem, dual chest flap pockets, and white rolled cuffs',
-  'tshirt-1.jpg': 'olive army green waffle-knit short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar placket and sleeve cuffs',
-  'tshirt-2.jpg': 'deep forest bottle-green textured short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar placket and sleeve cuffs',
-  'tshirt-3.jpg': 'deep forest bottle-green textured short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar placket and sleeve cuffs',
+
+  // Local T-Shirts (/products/tshirt-1..3.jpg)
+  'tshirt-1.jpg': 'olive army green waffle-knit short-sleeve mandarin-collar Henley polo t-shirt with crisp white contrast piping trim along the collar edge and sleeve cuffs and an S emblem on the left chest',
+  'tshirt-2.jpg': 'deep dark bottle-green textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a small metallic gold S emblem on the left chest',
+  'tshirt-3.jpg': 'deep dark bottle-green textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a small metallic gold S emblem on the left chest',
+
+  // 11 Live Supabase T-Shirts (#660 .. #670)
+  'product-1783882928184-b3qs2c.jpeg': 'deep dark forest-green textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and white S SNEHALATA logo on the left chest',
+  'product-1783882937577-dwe457.jpeg': 'deep midnight navy-blue textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and subtle S emblem on the left chest',
+  'product-1783882948427-1ha6yn.jpeg': 'olive army-green textured pique cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a gold S emblem on the left chest',
+  'product-1783882959037-3rtuok.jpeg': 'classic jet-black smooth cotton crew-neck short-sleeve minimalist t-shirt with a small white S SNEHALATA logo on the left chest',
+  'product-1783882966607-1hdkgd.jpeg': 'midnight navy-blue smooth cotton crew-neck short-sleeve t-shirt with crisp white SNEHALATA lettering across the center chest and a small white S emblem on the left chest',
+  'product-1783882975629-g00kfg.jpeg': 'deep dark bottle-green premium cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a small gold S emblem on the left chest',
+  'product-1783882984635-2woj1v.jpeg': 'jet-black premium cotton short-sleeve mandarin-collar polo t-shirt with warm gold/tan contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a gold S emblem on the left chest',
+  'product-1783883031751-2lzuqh.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small crisp white S emblem on the left chest',
+  'product-1783883079373-3kxi3i.jpeg': 'olive army-green premium cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a gold S emblem on the left chest',
+  'product-1783883087839-6n0m0y.jpeg': 'jet-black textured cotton short-sleeve mandarin-collar polo t-shirt with crisp white contrast piping trim along the mandarin collar edge and short sleeve cuffs, a 2-button placket, and a white S emblem on the left chest',
+  'product-1783883097706-2kw083.jpeg': 'classic jet-black premium cotton crew-neck short-sleeve t-shirt with a small white S emblem on the left chest',
+
+  // Sarees (/products/saree-1..3.jpg)
   'saree-1.jpg': 'midnight navy blue handwoven Jamdani silk saree with antique copper-gold zari geometric border, red-and-gold floral buti motifs on the pallu, and matching navy blue blouse',
   'saree-2.jpg': 'traditional Tangail handloom cotton saree with intricate woven heritage border and geometric motifs',
   'saree-3.jpg': 'royal sapphire blue pure silk Jamdani saree with shimmering silver-and-gold zari border and woven floral motifs across the pallu and pleats',
+
+  // Three-Piece Suits (/products/threepiece-1..2.jpg)
   'threepiece-1.jpg': 'deep wine-purple embroidered long kameez tunic with copper-gold neckline and hem embroidery, matching wine-purple straight trousers, and a wine-purple dupatta scarf with ornate gold border',
   'threepiece-2.jpg': 'slate denim-blue embroidered long kameez tunic with ornate copper-red and gold floral embroidery on the neckline and hem border, matching blue straight trousers, and matching blue dupatta scarf with copper-gold border',
+
+  // Panjabis (/products/panjabi-1..6.jpg & panjabi-kuthir-1..5.jpg)
   'panjabi-1.jpg': 'tailored Bangladeshi luxury men Panjabi kurta tunic in deep navy blue with intricate tonal blue geometric embroidery along the mandarin collar and chest placket',
   'panjabi-2.jpg': 'tailored Bangladeshi luxury men Panjabi kurta tunic with intricate embroidered mandarin collar and chest placket',
   'panjabi-3.jpg': 'crimson red men Panjabi kurta tunic covered all over in bold black abstract vertical and horizontal brush-stroke hatch patterns with a black-trimmed mandarin collar and metal buttons',
   'panjabi-4.jpg': 'crimson red men Panjabi kurta tunic covered in repeating golden-beige rectangular geometric block-print motifs across the torso and sleeves with an ornate embroidered mandarin collar',
   'panjabi-5.jpg': 'cream off-white men Panjabi kurta tunic covered in vibrant crimson-red and mustard-yellow pinwheel floral swirl prints across the entire fabric with a red-trimmed mandarin collar',
-  'panjabi-6.jpg': 'rich teal-blue men Panjabi kurta tunic with subtle self-textured weave and intricate tonal teal geometric embroidery on the mandarin collar and chest button placket'
+  'panjabi-6.jpg': 'rich teal-blue men Panjabi kurta tunic with subtle self-textured weave and intricate tonal teal geometric embroidery on the mandarin collar and chest button placket',
+  'panjabi-kuthir-1.jpg': 'soft mint-sage pastel green self-printed jacquard cotton men Panjabi kurta tunic with intricate darker teal-green geometric embroidery along the mandarin collar, long chest placket, and sleeve cuffs',
+  'panjabi-kuthir-2.jpg': 'warm dusty mauve-taupe textured cotton men Panjabi kurta tunic with intricate bronze-brown geometric embroidery along the mandarin collar, chest placket with square buttons, and sleeve cuffs',
+  'panjabi-kuthir-3.jpg': 'deep maroon burgundy textured cotton men Panjabi kurta tunic with rich copper-gold geometric embroidery along the mandarin collar, long chest placket, and sleeve cuffs',
+  'panjabi-kuthir-4.jpg': 'deep wine-maroon jacquard woven men Panjabi kurta tunic with subtle tonal diamond-check motifs across the fabric and antique gold embroidered trim along the mandarin collar, chest placket, and cuffs',
+  'panjabi-kuthir-5.jpg': 'deep emerald forest-green luxury Bangladeshi men Panjabi kurta tunic with rich golden zardozi floral embroidery around the mandarin collar, chest placket, and sleeve cuffs',
+  'img_8136.jpg': 'tailored Bangladeshi men contrast Panjabi kurta tunic with embroidered mandarin collar and chest button placket',
+
+  // Borkas (borka-161..164.jpg)
+  'borka-161.jpg': 'elegant modest full-length jet-black flowing luxury Abaya Borka gown with shimmering black crystal beadwork embroidery running vertically down the front panel and along the wide bell sleeves, paired with a matching black hijab scarf',
+  'borka-162.jpg': 'elegant modest full-length jet-black flowing luxury Abaya Borka gown with intricate black sequin and beadwork floral embroidery along the center front and wide sleeve cuffs, paired with a matching black hijab',
+  'borka-163.jpg': 'elegant modest full-length jet-black flowing Abaya Borka gown paired with an olive-green draped chiffon hijab scarf',
+  'borka-164.jpg': 'elegant modest full-length flowing luxury Abaya Borka gown with delicate vertical beadwork trim down the front and sleeves, paired with a matching draped hijab',
+
+  // Pants (/products/pant-1..5.jpg)
+  'pant-1.jpg': 'classic dark indigo blue slim-fit stretch denim jeans trousers with subtle vintage wash fade on the thighs and contrast tan stitching',
+  'pant-2.jpg': 'deep dark-wash midnight indigo slim-fit denim jeans trousers with clean tailoring and leather waistband patch',
+  'pant-3.jpg': 'charcoal navy-black slim-fit tactical cargo trousers featuring a side thigh utility flap pocket with zipper and flexible stretch cuffs',
+  'pant-4.jpg': 'olive green slim-fit utility cargo trousers with side flap pockets',
+  'pant-5.jpg': 'classic khaki-beige tailored cotton gabardine chino trousers'
 };
 
 // Banglish & Heritage Fashion Glossary for automatic prompt enrichment
@@ -160,18 +203,32 @@ function classifyPixelBucket(r: number, g: number, b: number): string {
 }
 
 /**
- * Multi-Cluster Spatial Color & Pattern Analyzer.
- * Finds the top distinct color buckets AND detects whether the fabric is solid, vertical-striped, or all-over printed.
+ * Multi-Cluster Spatial Color & Pattern Analyzer for Flat-Lay Garments.
+ * IMPORTANT: Never runs raw pixel-box sampling on model/banner photos (where background rooms/screens would pollute colors).
  */
-export async function analyzeGarmentVisualStructure(imageRef: string, clientColorHint?: string): Promise<string> {
-  // Check if this is a known catalog image first
+export async function analyzeGarmentVisualStructure(
+  imageRef: string,
+  visionCaption = '',
+  productTitle = ''
+): Promise<string> {
   const basename = (imageRef.split('/').pop() || '').split('?')[0].toLowerCase();
   if (CATALOG_VISUAL_DNA[basename]) {
     return CATALOG_VISUAL_DNA[basename];
   }
 
-  if (clientColorHint && clientColorHint.length > 12 && !/^#[0-9a-f]{6}$/i.test(clientColorHint.trim())) {
-    return clientColorHint.trim();
+  // If Florence-2 vision detected a human model or ad banner text, or if the product title already names an explicit color,
+  // do NOT run the raw pixel-box sampler (which would sample background walls, chandeliers, or skin tones).
+  const isModelOrBannerPhoto =
+    /\b(man|woman|person|boy|girl|model|standing|sitting|smiling|wearing|text that reads|collection|shop now|chandelier|room)\b/i.test(
+      visionCaption
+    );
+  const titleHasExplicitColor =
+    /\b(green|blue|navy|black|white|red|maroon|burgundy|olive|yellow|mustard|gold|pink|rose|purple|wine|violet|teal|cyan|grey|gray|charcoal|brown|beige|cream|ivory|orange|coral)\b/i.test(
+      productTitle
+    );
+
+  if (isModelOrBannerPhoto || titleHasExplicitColor) {
+    return '';
   }
 
   try {
@@ -194,10 +251,10 @@ export async function analyzeGarmentVisualStructure(imageRef: string, clientColo
     let vertGradSum = 0;
     let gradCount = 0;
 
-    // Sample the garment region (x: 20%..80%, y: 20%..80%), skipping center price-tag box (x: 42%..58%, y: 35%..55%)
-    for (let y = Math.floor(H * 0.2); y < Math.floor(H * 0.8); y++) {
-      for (let x = Math.floor(W * 0.2); x < Math.floor(W * 0.8); x++) {
-        if (x > W * 0.42 && x < W * 0.58 && y > H * 0.35 && y < H * 0.55) continue;
+    // Sample only the tight center garment fabric region (x: 30%..70%, y: 35%..75%), skipping neck tag box
+    for (let y = Math.floor(H * 0.35); y < Math.floor(H * 0.75); y++) {
+      for (let x = Math.floor(W * 0.3); x < Math.floor(W * 0.7); x++) {
+        if (x > W * 0.42 && x < W * 0.58 && y > H * 0.35 && y < H * 0.52) continue;
         const idx = (y * W + x) * step;
         const r = data[idx], g = data[idx + 1], b = data[idx + 2];
         const bucket = classifyPixelBucket(r, g, b);
@@ -221,7 +278,7 @@ export async function analyzeGarmentVisualStructure(imageRef: string, clientColo
 
     const sorted = Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .filter(([, c]) => c / totalSampled >= 0.12)
+      .filter(([, c]) => c / totalSampled >= 0.15)
       .slice(0, 3);
 
     const avgHoriz = gradCount ? horizGradSum / gradCount : 0;
@@ -280,12 +337,22 @@ function extractGradioCompleteJson(sseText: string): any {
 
 /**
  * Inspect the actual product image visually using Florence-2-Large Vision.
+ * Preserves the exact sentence describing what garment the model is wearing or what is on the hanger!
  */
-export async function describeGarmentImageVisually(productImgRef: string): Promise<string> {
+export async function describeGarmentImageVisually(productImgRef: string): Promise<{
+  cleanGarmentCaption: string;
+  rawCaption: string;
+  isCatalogExactMatch: boolean;
+}> {
   const basename = (productImgRef.split('/').pop() || '').split('?')[0].toLowerCase();
   if (CATALOG_VISUAL_DNA[basename]) {
-    return CATALOG_VISUAL_DNA[basename];
+    return {
+      cleanGarmentCaption: CATALOG_VISUAL_DNA[basename],
+      rawCaption: CATALOG_VISUAL_DNA[basename],
+      isCatalogExactMatch: true
+    };
   }
+
   try {
     const { buffer, mimeType, ext } = await resolveImageBuffer(productImgRef);
     const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
@@ -295,12 +362,12 @@ export async function describeGarmentImageVisually(productImgRef: string): Promi
     const upResp = await fetch(`${FLORENCE_SPACE}/gradio_api/upload`, {
       method: 'POST',
       body: form,
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(5500)
     });
-    if (!upResp.ok) return '';
+    if (!upResp.ok) return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
     const upPaths = await upResp.json();
     const uploadedPath = Array.isArray(upPaths) ? upPaths[0] : null;
-    if (!uploadedPath) return '';
+    if (!uploadedPath) return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
 
     const callResp = await fetch(`${FLORENCE_SPACE}/gradio_api/call/describe_image`, {
       method: 'POST',
@@ -308,107 +375,107 @@ export async function describeGarmentImageVisually(productImgRef: string): Promi
       body: JSON.stringify({
         data: [{ path: uploadedPath, meta: { _type: 'gradio.FileData' } }, 'Florence-2-large']
       }),
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(5500)
     });
-    if (!callResp.ok) return '';
+    if (!callResp.ok) return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
     const { event_id } = await callResp.json();
-    if (!event_id) return '';
+    if (!event_id) return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
 
     const sseResp = await fetch(`${FLORENCE_SPACE}/gradio_api/call/describe_image/${event_id}`, {
       signal: AbortSignal.timeout(12000)
     });
-    if (!sseResp.ok) return '';
+    if (!sseResp.ok) return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
     const text = await sseResp.text();
     const parsed = extractGradioCompleteJson(text);
     const rawCaption = typeof parsed?.[0] === 'string' ? parsed[0].trim() : '';
-    if (!rawCaption) return '';
+    if (!rawCaption) return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
 
-    // Strip out hanger, tag, wooden background, or model pose sentences so only pure garment details remain
-    return rawCaption
+    // Cleanly extract ONLY the wearable garment sentences without deleting "standing/wearing" sentences!
+    const sentences = rawCaption
       .replace(/hanging on a [a-z\s]*hanger/gi, '')
       .replace(/on a [a-z\s]*hanger/gi, '')
       .split(/\.\s+/)
-      .filter((s) => !/background is|standing|sitting|looking|expression|hair is|hands on|white tag|blue label|reads/i.test(s))
-      .join('. ')
-      .trim();
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) =>
+        s
+          // Strip leading "The image shows a young man standing in a luxurious room with a chandelier in the background" ONLY if it doesn't contain "wearing"
+          .replace(/^The image shows (?:a|an) [^.]*?\b(?:wearing|dressed in)\s+/i, '')
+          .replace(/^(?:He|She|The man|The woman|The model|The person) is (?:wearing|dressed in)\s+/i, '')
+      )
+      .filter(
+        (s) =>
+          !/^(?:The image shows (?:a|an) (?:young |handsome )?(?:man|woman|person|boy|girl) (?:standing|sitting|posing) in|He has a beard|She has|On the (?:right|left) side of the image|Below the text|The text also|There is (?:also )?a "(?:Shop Now|Buy)|There is a small white tag|The background is)/i.test(
+            s
+          )
+      );
+
+    return {
+      cleanGarmentCaption: sentences.join('. ').trim(),
+      rawCaption,
+      isCatalogExactMatch: false
+    };
   } catch {
-    return '';
+    return { cleanGarmentCaption: '', rawCaption: '', isCatalogExactMatch: false };
   }
 }
 
 /**
- * Use DeepSeek V3 to fuse the visual caption, multi-cluster color/pattern structure, and product metadata
- * into a laser-accurate FLUX.1 Kontext garment replacement instruction.
+ * Build a 100% deterministic, image-first garment replacement instruction.
+ * Never allows a mismatched DB title or background-room color to override the actual visual garment!
  */
-async function synthesizeExactTryOnPrompt(opts: {
+function buildExactTryOnPrompt(opts: {
   category: string;
   cleanName: string;
   cleanDesc: string;
   visualStructure: string;
   visionCaption: string;
-}): Promise<string> {
-  const { category, cleanName, cleanDesc, visualStructure, visionCaption } = opts;
+  isCatalogExactMatch: boolean;
+}): string {
+  const { category, cleanName, cleanDesc, visualStructure, visionCaption, isCatalogExactMatch } = opts;
   const catLower = category.toLowerCase();
 
-  let defaultDrape = 'fitted naturally with realistic fabric folds, collar, sleeves, and studio lighting';
+  let removalClause =
+    "Completely replace the person's current clothing (removing any suit jacket, blazer, coat, or previous top)";
+  let fitClause = 'fitted naturally with realistic fabric folds, collar, sleeves, and studio lighting';
+
   if (/saree|shari/i.test(catLower)) {
-    defaultDrape = 'draped in traditional Bangladeshi Nivi saree style with pleated front, matching blouse, and ornate pallu over the shoulder';
+    fitClause =
+      'draped in traditional Bangladeshi Nivi saree style with pleated front, matching fitted blouse, and ornate pallu draped over the shoulder';
   } else if (/panjabi/i.test(catLower)) {
-    defaultDrape = 'tailored as a Bangladeshi men Panjabi tunic kurta with embroidered mandarin collar and chest placket';
+    fitClause =
+      'tailored as a Bangladeshi men Panjabi tunic kurta with embroidered mandarin collar and chest button placket';
   } else if (/borka|abaya/i.test(catLower)) {
-    defaultDrape = 'styled as a modest full-length flowing luxury Abaya Borka gown';
+    fitClause = 'styled as a modest full-length flowing luxury Abaya Borka gown';
   } else if (/three-?piece|kameez/i.test(catLower)) {
-    defaultDrape = 'styled as a Bangladeshi embroidered three-piece salwar kameez tunic with matching trousers and draped dupatta scarf';
+    fitClause =
+      'styled as a Bangladeshi embroidered three-piece salwar kameez tunic with matching trousers and draped dupatta scarf';
+  } else if (/t-?shirt|polo/i.test(catLower)) {
+    fitClause =
+      'worn as a standalone short-sleeve shirt/polo on the torso with bare forearms visible (completely remove any suit jacket, blazer, or long-sleeve outer coat)';
   } else if (/shirt/i.test(catLower)) {
-    defaultDrape = 'worn as a standalone button-down shirt with visible collar, buttons, full pattern across the chest and sleeves, and cuffs (completely remove any suit jacket, blazer, or coat)';
+    fitClause =
+      'worn as a standalone button-down shirt with visible collar, buttons, full pattern across the chest and sleeves, and cuffs (completely remove any suit jacket, blazer, or outer coat)';
+  } else if (/pant|trouser|jeans/i.test(catLower)) {
+    removalClause = "Replace the person's lower-body trousers/pants";
+    fitClause = 'tailored naturally on the lower body with realistic denim/cotton folds';
   }
 
-  const combinedDetails = [
-    visualStructure ? `Exact Garment Visual Pattern & Colors: ${visualStructure}` : '',
-    visionCaption ? `Vision Inspection of Garment Photo: ${visionCaption}` : '',
-    `Product Title: ${cleanName} (${category})`,
-    cleanDesc ? `Catalog Notes: ${cleanDesc}` : ''
-  ]
-    .filter(Boolean)
-    .join(' | ');
-
-  if (DEEPSEEK_KEY) {
-    try {
-      const resp = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${DEEPSEEK_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          temperature: 0.1,
-          max_tokens: 180,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You write ultra-precise image-editing prompts for FLUX.1 Kontext virtual try-on. Given visual inspection data of a garment, write a 2-sentence instruction starting with "Completely replace the person\'s current clothing (removing any suit jacket, blazer, or outer coat) so they are wearing ONLY..." Describe the exact base color, secondary pattern/print colors, stripe/floral/paisley/geometric layout, collar, sleeves, and cuffs with 100% fidelity. End with: "Keep the person\'s exact face, hair, skin tone, pose, and background 100% unchanged." Output ONLY the prompt text.'
-            },
-            {
-              role: 'user',
-              content: combinedDetails
-            }
-          ]
-        }),
-        signal: AbortSignal.timeout(4500)
-      });
-      if (resp.ok) {
-        const j = await resp.json();
-        const text = j?.choices?.[0]?.message?.content?.trim();
-        if (text && text.length > 30) return text;
-      }
-    } catch {
-      // Fall back to deterministic prompt below
-    }
+  // If we have an exact human-verified visual DNA signature for this image filename, use it as the sole ground truth
+  // (preventing mismatched database titles like "Casual Check Shirt" on solid navy shirt-2.jpg from confusing the model).
+  if (isCatalogExactMatch && visualStructure) {
+    return `${removalClause} so they are wearing ONLY this exact garment: ${visualStructure}. Styled ${fitClause}. Keep the person's exact face, facial expression, beard, hairstyle, skin tone, pose, and background 100% identical and unchanged.`;
   }
 
-  return `Completely replace the person's current clothing (removing any suit jacket, blazer, or outer coat) so they are wearing ONLY this exact ${category}: ${visualStructure || cleanName}. ${visionCaption ? `Garment details: ${visionCaption}.` : ''} Styled ${defaultDrape}. Keep the person's exact face, facial expression, hairstyle, skin tone, hands, pose, and background 100% identical and unchanged.`;
+  // Otherwise, combine BOTH the translated product title AND the cleaned Florence-2 visual garment caption
+  const parts = [
+    cleanName ? `${cleanName} (${category})` : category,
+    visionCaption ? `Visual details from product photo: ${visionCaption}` : '',
+    visualStructure ? `Fabric pattern & color profile: ${visualStructure}` : '',
+    cleanDesc ? `Style notes: ${cleanDesc}` : ''
+  ].filter(Boolean);
+
+  return `${removalClause} so they are wearing ONLY this exact garment: ${parts.join('. ')}. Styled ${fitClause}. Keep the person's exact face, facial expression, beard, hairstyle, skin tone, pose, and background 100% identical and unchanged.`;
 }
 
 /**
@@ -420,7 +487,8 @@ async function readGradioSseAndFetchDataUrl(baseSpaceUrl: string, sseResp: Respo
   if (!parsed) return null;
 
   const first = Array.isArray(parsed) ? parsed[0] : parsed;
-  const fileObj = first?.image || first;
+  const firstItem = Array.isArray(first) ? first[0] : first;
+  const fileObj = firstItem?.image || firstItem;
   let fileUrl: string | null = fileObj?.url || null;
   if (!fileUrl && fileObj?.path) {
     fileUrl = `${baseSpaceUrl}/gradio_api/file=${fileObj.path}`;
@@ -435,15 +503,140 @@ async function readGradioSseAndFetchDataUrl(baseSpaceUrl: string, sseResp: Respo
 }
 
 /**
+ * True 2-Image Pixel-Exact Virtual Try-On via FASHN VTON 1.5 (fashn-ai-fashn-vton-1-5.hf.space).
+ * Takes BOTH person_image AND garment_image directly and warps the exact garment onto the person.
+ */
+export async function tryOnWithFashnVton(opts: {
+  userImg: string;
+  productImg: string;
+  category?: string;
+  isModelPhoto?: boolean;
+}): Promise<string | null> {
+  const catLower = (opts.category || '').toLowerCase();
+  let vtonCategory: 'tops' | 'bottoms' | 'one-pieces' = 'tops';
+  if (/pant|trouser|jeans|salwar|pajama/i.test(catLower)) {
+    vtonCategory = 'bottoms';
+  } else if (/saree|shari|borka|abaya|three-?piece|kameez|dress|gown/i.test(catLower)) {
+    vtonCategory = 'one-pieces';
+  }
+
+  const photoType: 'model' | 'flat-lay' = opts.isModelPhoto ? 'model' : 'flat-lay';
+
+  const uploadOne = async (ref: string, label: string) => {
+    const { buffer, mimeType, ext } = await resolveImageBuffer(ref);
+    const form = new FormData();
+    form.append('files', new Blob([new Uint8Array(buffer)], { type: mimeType }), `${label}.${ext}`);
+    const r = await fetch(`${FASHN_VTON_SPACE}/gradio_api/upload`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!r.ok) throw new Error(`FASHN upload failed (${r.status})`);
+    const j = await r.json();
+    return Array.isArray(j) ? j[0] : null;
+  };
+
+  const [pPath, gPath] = await Promise.all([
+    uploadOne(opts.userImg, 'person'),
+    uploadOne(opts.productImg, 'garment')
+  ]);
+  if (!pPath || !gPath) return null;
+
+  const callResp = await fetch(`${FASHN_VTON_SPACE}/gradio_api/call/try_on`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: [
+        { path: pPath, meta: { _type: 'gradio.FileData' } },
+        { path: gPath, meta: { _type: 'gradio.FileData' } },
+        vtonCategory,
+        photoType,
+        30,
+        1.5,
+        42,
+        true
+      ]
+    }),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!callResp.ok) return null;
+  const { event_id } = await callResp.json();
+  if (!event_id) return null;
+
+  const sseResp = await fetch(`${FASHN_VTON_SPACE}/gradio_api/call/try_on/${event_id}`, {
+    signal: AbortSignal.timeout(35000)
+  });
+  if (!sseResp.ok) return null;
+  return await readGradioSseAndFetchDataUrl(FASHN_VTON_SPACE, sseResp);
+}
+
+/**
+ * True 2-Image Multi-Modal Garment Try-On via Qwen-Image-Edit-2511 (passes [userImg, productImg] together).
+ */
+export async function tryOnWithQwenMultiImage(
+  userImg: string,
+  productImg: string,
+  prompt: string
+): Promise<string | null> {
+  const uploadOne = async (ref: string, label: string) => {
+    const { buffer, mimeType, ext } = await resolveImageBuffer(ref);
+    const form = new FormData();
+    form.append('files', new Blob([new Uint8Array(buffer)], { type: mimeType }), `${label}.${ext}`);
+    const r = await fetch(`${QWEN_EDIT_SPACE}/gradio_api/upload`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!r.ok) throw new Error(`Qwen upload failed (${r.status})`);
+    const j = await r.json();
+    return Array.isArray(j) ? j[0] : null;
+  };
+
+  const [pPath, gPath] = await Promise.all([uploadOne(userImg, 'person'), uploadOne(productImg, 'garment')]);
+  if (!pPath || !gPath) return null;
+
+  const callResp = await fetch(`${QWEN_EDIT_SPACE}/gradio_api/call/infer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: [
+        [
+          { image: { path: pPath, meta: { _type: 'gradio.FileData' } }, caption: null },
+          { image: { path: gPath, meta: { _type: 'gradio.FileData' } }, caption: null }
+        ],
+        `Photorealistic virtual try-on: Take the person in image 1 and dress them in the exact garment shown in image 2. ${prompt}`,
+        42,
+        false,
+        1.0,
+        4,
+        1024,
+        768,
+        true
+      ]
+    }),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!callResp.ok) return null;
+  const { event_id } = await callResp.json();
+  if (!event_id) return null;
+
+  const sseResp = await fetch(`${QWEN_EDIT_SPACE}/gradio_api/call/infer/${event_id}`, {
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!sseResp.ok) return null;
+  return await readGradioSseAndFetchDataUrl(QWEN_EDIT_SPACE, sseResp);
+}
+
+/**
  * Upload an image buffer to FLUX.1 Kontext Dev and run in-context editing.
  * Returns a self-contained data:image/webp;base64,... URL.
  */
 export async function editImageWithFluxKontext(
   imageRef: string,
-  editPrompt: string,
-  opts: { guidanceScale?: number; steps?: number; preUploadedPath?: string } = {}
+  prompt: string,
+  options?: { guidanceScale?: number; steps?: number; seed?: number; preUploadedPath?: string }
 ): Promise<string | null> {
-  let uploadedPath = opts.preUploadedPath || null;
+  let uploadedPath = options?.preUploadedPath || null;
 
   if (!uploadedPath) {
     const { buffer, mimeType, ext } = await resolveImageBuffer(imageRef);
@@ -461,7 +654,11 @@ export async function editImageWithFluxKontext(
     uploadedPath = Array.isArray(upPaths) ? upPaths[0] : null;
   }
 
-  if (!uploadedPath) throw new Error('Kontext upload returned empty path');
+  if (!uploadedPath) throw new Error('Kontext upload returned no file path');
+
+  const guidance = options?.guidanceScale ?? 2.5;
+  const steps = options?.steps ?? 26;
+  const seed = options?.seed ?? 42;
 
   const callResp = await fetch(`${KONTEXT_SPACE}/gradio_api/call/infer`, {
     method: 'POST',
@@ -469,11 +666,11 @@ export async function editImageWithFluxKontext(
     body: JSON.stringify({
       data: [
         { path: uploadedPath, meta: { _type: 'gradio.FileData' } },
-        editPrompt,
-        0,
-        true,
-        opts.guidanceScale ?? 2.5,
-        opts.steps ?? 24
+        prompt,
+        seed,
+        false,
+        guidance,
+        steps
       ]
     }),
     signal: AbortSignal.timeout(15000)
@@ -491,7 +688,7 @@ export async function editImageWithFluxKontext(
 }
 
 /**
- * Virtual Garment Try-On powered by FLUX.1 Kontext Dev + Multi-Cluster Visual & Pattern Inspection.
+ * Virtual Garment Try-On powered by Vision-Grounded FLUX.1 Kontext Dev + 2-Image FASHN VTON 1.5 + Qwen Multi-Image.
  */
 export async function tryOnGarmentFree(opts: {
   userImg: string;
@@ -514,30 +711,66 @@ export async function tryOnGarmentFree(opts: {
     if (!upResp.ok) throw new Error(`Kontext upload failed (${upResp.status})`);
     const upPaths = await upResp.json();
     return Array.isArray(upPaths) ? upPaths[0] : null;
-  })();
+  })().catch(() => null);
 
-  const [uploadedUserPath, visualStructure, visionCaption, cleanName, cleanDesc] = await Promise.all([
+  const [uploadedUserPath, visionData, cleanName, cleanDesc] = await Promise.all([
     uploadUserPromise,
-    analyzeGarmentVisualStructure(opts.productImg, opts.colorHint),
     describeGarmentImageVisually(opts.productImg),
     translateAndEnhancePrompt((opts.productName || opts.category || 'Traditional Garment').trim()),
-    opts.productDescription ? translateAndEnhancePrompt(opts.productDescription.slice(0, 160)) : Promise.resolve('')
+    opts.productDescription ? translateAndEnhancePrompt(opts.productDescription.slice(0, 140)) : Promise.resolve('')
   ]);
 
+  const visualStructure = await analyzeGarmentVisualStructure(
+    opts.productImg,
+    visionData.rawCaption,
+    cleanName
+  );
+
   const cat = (opts.category || 'Traditional Garment').trim();
-  const prompt = await synthesizeExactTryOnPrompt({
+  const prompt = buildExactTryOnPrompt({
     category: cat,
     cleanName,
     cleanDesc,
     visualStructure,
-    visionCaption
+    visionCaption: visionData.cleanGarmentCaption,
+    isCatalogExactMatch: visionData.isCatalogExactMatch
   });
 
-  return await editImageWithFluxKontext(opts.userImg, prompt, {
-    guidanceScale: 2.5,
-    steps: 26,
-    preUploadedPath: uploadedUserPath || undefined
-  });
+  // Primary Lane: FLUX.1 Kontext Dev with exact visual DNA / cleaned Florence-2 garment vision
+  try {
+    const kontextOut = await editImageWithFluxKontext(opts.userImg, prompt, {
+      guidanceScale: 3.0,
+      steps: 28,
+      preUploadedPath: uploadedUserPath || undefined
+    });
+    if (kontextOut) return kontextOut;
+  } catch (e: any) {
+    console.warn('[tryOnGarmentFree] Kontext primary lane error:', e?.message);
+  }
+
+  // Secondary Lane: True 2-Image FASHN VTON 1.5 (passes BOTH userImg and productImg directly)
+  try {
+    const isModelPhoto = /\b(man|woman|person|model|wearing|standing|sitting)\b/i.test(visionData.rawCaption);
+    const vtonOut = await tryOnWithFashnVton({
+      userImg: opts.userImg,
+      productImg: opts.productImg,
+      category: cat,
+      isModelPhoto
+    });
+    if (vtonOut) return vtonOut;
+  } catch (e: any) {
+    console.warn('[tryOnGarmentFree] FASHN VTON secondary lane error:', e?.message);
+  }
+
+  // Tertiary Lane: True 2-Image Qwen-Image-Edit-2511 (passes [userImg, productImg] gallery)
+  try {
+    const qwenOut = await tryOnWithQwenMultiImage(opts.userImg, opts.productImg, prompt);
+    if (qwenOut) return qwenOut;
+  } catch (e: any) {
+    console.warn('[tryOnGarmentFree] Qwen multi-image tertiary lane error:', e?.message);
+  }
+
+  return null;
 }
 
 /**
@@ -561,33 +794,30 @@ export async function applyMakeupFree(selfie: string, shade: string, kind = 'lip
  */
 export async function applyStyleTransferFree(image: string, styleInstruction: string): Promise<string | null> {
   const cleanStyle = await translateAndEnhancePrompt(styleInstruction);
-  const prompt = `Transform and re-style this image into the artistic aesthetic of: ${cleanStyle}. Preserve the person's facial identity, pose, and core subject composition while shifting the lighting, color grading, texture, and artistic medium to match ${cleanStyle}.`;
+  const prompt = `Transform the artistic lighting, atmosphere, and color grading of this fashion portrait into "${cleanStyle}" style while preserving the person's exact facial identity, features, clothing design, and pose.`;
 
   return await editImageWithFluxKontext(image, prompt, { guidanceScale: 2.5, steps: 24 });
 }
 
 /**
- * Free Text-to-Image & Reference-to-Image Fashion Generator.
+ * 100% Free Text-to-Image Generator (with optional Reference Image Remix via FLUX.1 Kontext Dev).
  */
 export async function generateFashionImageFree(opts: {
   prompt: string;
-  referenceImage?: string;
-  aspectRatio?: '1:1' | '3:4' | '16:9' | '9:16';
+  referenceImage?: string | null;
+  aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
   quality?: 'turbo' | 'hd';
-}): Promise<string | null> {
-  const enhancedPrompt = await translateAndEnhancePrompt(opts.prompt);
-  const fullPrompt = `${enhancedPrompt}. High-end fashion editorial photography, photorealistic textures, natural lighting, sharp focus, 8k resolution.`;
+}): Promise<{ image: string; engine: string } | null> {
+  const cleanPrompt = await translateAndEnhancePrompt(opts.prompt);
+  const fullPrompt = `${cleanPrompt}, photorealistic luxury South Asian Bangladeshi fashion photography, ultra-detailed fabric texture, studio lighting, 8k resolution`;
 
-  if (opts.referenceImage && opts.referenceImage.trim().length > 5) {
-    try {
-      const edited = await editImageWithFluxKontext(opts.referenceImage, fullPrompt, {
-        guidanceScale: 2.5,
-        steps: 24
-      });
-      if (edited) return edited;
-    } catch (e: any) {
-      console.warn('[freeImageEngine] Kontext reference remix fallback to text2img:', e?.message);
-    }
+  if (opts.referenceImage) {
+    const edited = await editImageWithFluxKontext(
+      opts.referenceImage,
+      `${fullPrompt}. Preserve the subject's core composition while transforming according to the instruction.`,
+      { guidanceScale: 2.8, steps: 26 }
+    );
+    if (edited) return { image: edited, engine: 'flux-kontext-free' };
   }
 
   let width = 768;
@@ -598,57 +828,59 @@ export async function generateFashionImageFree(opts: {
   } else if (opts.aspectRatio === '16:9') {
     width = 1024;
     height = 576;
-  } else if (opts.aspectRatio === '9:16' || opts.aspectRatio === '3:4') {
-    width = 768;
+  } else if (opts.aspectRatio === '4:3') {
+    width = 1024;
+    height = 768;
+  } else if (opts.aspectRatio === '9:16') {
+    width = 576;
     height = 1024;
   }
 
-  const runSchnell = async (): Promise<string | null> => {
-    const callResp = await fetch(`${SCHNELL_SPACE}/gradio_api/call/infer`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: [fullPrompt, 0, true, width, height, 4]
-      }),
-      signal: AbortSignal.timeout(12000)
-    });
-    if (!callResp.ok) throw new Error(`Schnell call failed (${callResp.status})`);
-    const { event_id } = await callResp.json();
-    if (!event_id) throw new Error('Schnell returned no event_id');
-    const sseResp = await fetch(`${SCHNELL_SPACE}/gradio_api/call/infer/${event_id}`, {
-      signal: AbortSignal.timeout(30000)
-    });
-    if (!sseResp.ok) throw new Error(`Schnell SSE failed (${sseResp.status})`);
-    return await readGradioSseAndFetchDataUrl(SCHNELL_SPACE, sseResp);
-  };
-
-  const runMergedHd = async (): Promise<string | null> => {
-    const callResp = await fetch(`${MERGED_SPACE}/gradio_api/call/infer`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: [fullPrompt, 0, true, width, height, 3.5, 8]
-      }),
-      signal: AbortSignal.timeout(12000)
-    });
-    if (!callResp.ok) throw new Error(`Merged HD call failed (${callResp.status})`);
-    const { event_id } = await callResp.json();
-    if (!event_id) throw new Error('Merged HD returned no event_id');
-    const sseResp = await fetch(`${MERGED_SPACE}/gradio_api/call/infer/${event_id}`, {
-      signal: AbortSignal.timeout(35000)
-    });
-    if (!sseResp.ok) throw new Error(`Merged HD SSE failed (${sseResp.status})`);
-    return await readGradioSseAndFetchDataUrl(MERGED_SPACE, sseResp);
-  };
-
-  const engines = opts.quality === 'hd' ? [runMergedHd, runSchnell] : [runSchnell, runMergedHd];
-  for (const engine of engines) {
+  if (opts.quality === 'hd') {
     try {
-      const out = await engine();
-      if (out) return out;
-    } catch (e: any) {
-      console.warn('[freeImageEngine] engine lane failed, trying next:', e?.message);
+      const callResp = await fetch(`${MERGED_SPACE}/gradio_api/call/infer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: [fullPrompt, 0, true, width, height, 3.5, 8]
+        }),
+        signal: AbortSignal.timeout(12000)
+      });
+      if (callResp.ok) {
+        const { event_id } = await callResp.json();
+        if (event_id) {
+          const sseResp = await fetch(`${MERGED_SPACE}/gradio_api/call/infer/${event_id}`, {
+            signal: AbortSignal.timeout(35000)
+          });
+          if (sseResp.ok) {
+            const img = await readGradioSseAndFetchDataUrl(MERGED_SPACE, sseResp);
+            if (img) return { image: img, engine: 'flux-merged-hd' };
+          }
+        }
+      }
+    } catch {
+      // Fall through to Schnell Turbo
     }
   }
-  return null;
+
+  const callResp = await fetch(`${SCHNELL_SPACE}/gradio_api/call/infer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: [fullPrompt, 0, true, width, height, 4]
+    }),
+    signal: AbortSignal.timeout(12000)
+  });
+  if (!callResp.ok) throw new Error(`Schnell call failed (${callResp.status})`);
+  const { event_id } = await callResp.json();
+  if (!event_id) throw new Error('Schnell returned no event_id');
+
+  const sseResp = await fetch(`${SCHNELL_SPACE}/gradio_api/call/infer/${event_id}`, {
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!sseResp.ok) throw new Error(`Schnell SSE failed (${sseResp.status})`);
+
+  const img = await readGradioSseAndFetchDataUrl(SCHNELL_SPACE, sseResp);
+  if (!img) return null;
+  return { image: img, engine: 'flux-schnell-free' };
 }
